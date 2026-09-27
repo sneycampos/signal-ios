@@ -1,0 +1,94 @@
+name: Signal
+options:
+  bundleIdPrefix: com.silviogodinho
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    DEVELOPMENT_TEAM: "677L8TYNN9"
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  SignalCore:
+    type: framework
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Sources/SignalCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: "com.silviogodinho.SignalCore"
+        GENERATE_INFOPLIST_FILE: YES
+
+  SignalUI:
+    type: framework
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Sources/SignalUI
+    dependencies:
+      - target: SignalCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: "com.silviogodinho.SignalUI"
+        GENERATE_INFOPLIST_FILE: YES
+
+  Signal:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Sources/SignalApp
+      - path: Resources
+    dependencies:
+      - target: SignalCore
+      - target: SignalUI
+    info:
+      path: Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Signal
+        CFBundleDevelopmentRegion: en
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        NSCameraUsageDescription: "Signal uses the camera and LiDAR scanner to scan your rooms and show Wi-Fi signal in augmented reality."
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIRequiredDeviceCapabilities: [arm64]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Signal Project
+            LSHandlerRank: Owner
+            LSItemContentTypes: [com.silviogodinho.signal.project]
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.silviogodinho.signal.project
+            UTTypeDescription: Signal Project
+            UTTypeConformsTo: [public.json, public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: [signalsim]
+              public.mime-type: [application/x-signalsim]
+    settings:
+      base:
+        PRODUCT_NAME: "Signal"
+        PRODUCT_BUNDLE_IDENTIFIER: "com.silviogodinho.signal"
+        MARKETING_VERSION: "1.1.0"
+        CURRENT_PROJECT_VERSION: "2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: "AppIcon"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_IDENTITY: "Apple Development"
+        ENABLE_PREVIEWS: NO
