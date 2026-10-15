@@ -37,6 +37,7 @@
 		82474E0E9FE1417EF42E7CD5 /* SignalStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE47935148E4DA467DE52CB1 /* SignalStyle.swift */; };
 		82A4043DF242778AD3DE6D17 /* ProjectsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1010D21FE082A2EEBD09102F /* ProjectsHomeView.swift */; };
 		8AC49E630FB2B455A1614F14 /* RoomPlanConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBC2BC8562534943606D1285 /* RoomPlanConverter.swift */; };
+		8C70DDE6DCA7DA6886C2A979 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 46712C0B684D0E2D8D2E4EB2 /* PrivacyInfo.xcprivacy */; };
 		8E9A341F6AD943718111614C /* SignalCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DA7C5095666671806890490E /* SignalCore.framework */; };
 		90F4E3CB5C34E3F54C6F6FB3 /* ProjectDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 064BA8D6CC607D4235DA320D /* ProjectDocument.swift */; };
 		960E77E3204FBD8E415628F6 /* RFBand.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21789A6B535236B45702061 /* RFBand.swift */; };
@@ -114,6 +115,7 @@
 		2FEE0EF2E2E8B16589E1A621 /* SignalUI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SignalUI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		41484690F67913FBAFF6A885 /* RoomPlanExtraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomPlanExtraction.swift; sourceTree = "<group>"; };
 		44136B842C093C402DE9F804 /* Glass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Glass.swift; sourceTree = "<group>"; };
+		46712C0B684D0E2D8D2E4EB2 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		4B856039F7C7FA3BEEB303F2 /* SignalScale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalScale.swift; sourceTree = "<group>"; };
 		4F7E2124F4734352658B2870 /* ReportRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportRenderer.swift; sourceTree = "<group>"; };
 		58AA65134839EB1D3CE4BCCC /* InspectorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorSheet.swift; sourceTree = "<group>"; };
@@ -242,6 +244,7 @@
 			children = (
 				5AE72186C4E1D2ECEE491817 /* Assets.xcassets */,
 				1DB8CA4C7927EFCDC8AB7981 /* Info.plist */,
+				46712C0B684D0E2D8D2E4EB2 /* PrivacyInfo.xcprivacy */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -492,6 +495,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7DE5C3AF8472E76D702AF6E4 /* Assets.xcassets in Resources */,
+				8C70DDE6DCA7DA6886C2A979 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
