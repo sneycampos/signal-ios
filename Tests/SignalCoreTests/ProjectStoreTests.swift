@@ -30,7 +30,7 @@ struct ProjectStoreTests {
         #expect(loaded.walls == project.walls)
         #expect(loaded.rooms == project.rooms)
 
-        await store.delete(id: project.id)
+        try await store.delete(id: project.id)
         #expect(await store.list().isEmpty)
         #expect(await store.worldMap(for: project.id) == nil)
         #expect(await store.backups(for: project.id).isEmpty)
