@@ -1,11 +1,11 @@
 # shellcheck shell=bash
 # Shared helpers. Sourced by the other scripts.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT="$ROOT/Signal.xcodeproj"
-SCHEME="Signal"
+PROJECT="$ROOT/MeshPlanner.xcodeproj"
+SCHEME="MeshPlanner"
 BUNDLE_ID="com.silviogodinho.signal"
 DERIVED="${DERIVED_DATA:-$ROOT/build/DerivedData}"
-APP_NAME="Signal"          # PRODUCT_NAME of the app target (display name: Mesh Planner)
+APP_NAME="MeshPlanner"     # PRODUCT_NAME of the app target (display name: Mesh Planner)
 MIN_XCODE=26
 
 die()  { echo "error: $*" >&2; exit 1; }
@@ -34,7 +34,7 @@ require_xcodegen() {
 
 generate() {
   require_xcodegen
-  info "Generating Signal.xcodeproj from project.yml"
+  info "Generating MeshPlanner.xcodeproj from project.yml"
   (cd "$ROOT" && xcodegen generate --quiet)
 }
 

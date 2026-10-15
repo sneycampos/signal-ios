@@ -1,0 +1,1043 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		084FE28B5F8FA04CC609F6DE /* MeshPlannerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ED36F8FB6A1A15B8E4B98EA /* MeshPlannerUITests.swift */; };
+		09602A6900D7C772F738EB62 /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7966741FCF032C50DD7F49C /* AppRootView.swift */; };
+		127FE81AFDC44BABDEAB1582 /* MeshPlannerUI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D39F8FF843426860E3D1DE75 /* MeshPlannerUI.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		12ACDBFCB129A3273AD12EAD /* RoomInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B56DCD98CE35F7A136DEA7 /* RoomInfo.swift */; };
+		196F4D06DAFDCA8D8D38D0DF /* OptimizerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 363617133683857B3489F9B6 /* OptimizerSheet.swift */; };
+		1CFF7AC1F0886EA9DE3BE770 /* RoomPlanConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E738BA3B99984057FEDBAB81 /* RoomPlanConverter.swift */; };
+		1E707A9C4F6B467C1BCA6759 /* RFPropagationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79122F086B6CD446F60F36B0 /* RFPropagationEngine.swift */; };
+		1FD82C8AD30D057635F5E723 /* FloorplanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F5DB4E277D1681A45D7ADF /* FloorplanViewModel.swift */; };
+		202CFEE074203831431FDA32 /* SupportSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6080C120CF8A97AA2FB5D65 /* SupportSheets.swift */; };
+		2F31FDB864D75DA734294FF4 /* BackhaulPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8E7AB8E53A39AA87C5253F9 /* BackhaulPlanner.swift */; };
+		3537FF040E256439370EC962 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C1AB096449BE10EA64DBB837 /* PrivacyInfo.xcprivacy */; };
+		35B0768157269661C0251A08 /* Geometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D131609C2411898BC08AD30 /* Geometry.swift */; };
+		3A63236B84516F78776624CD /* MeshPlannerCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 913F90AFCBFFB613F793D6F7 /* MeshPlannerCore.framework */; };
+		3F95453ABB04D7D0B556D9F8 /* RFWallSegment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0177416BCF924C878B23D0CD /* RFWallSegment.swift */; };
+		400752812DC9013D8E012420 /* FloorplanCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B6B0534CB2AF0516594F294 /* FloorplanCanvas.swift */; };
+		41948DD94BF68C58A812806E /* RoomRegionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30F8F2A4758C602E4E55988 /* RoomRegionDetector.swift */; };
+		486037D4D1DA3245F1255947 /* RFPathResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CE7C74753CE39153A18A335 /* RFPathResult.swift */; };
+		4940A4DEA45117A24247CCA6 /* ProjectsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE935ED933BAA7F7E12AB2EF /* ProjectsHomeView.swift */; };
+		4ADAAAA643F84DC436AB0253 /* RFMaterial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84079B1D7EEDA3E063F05643 /* RFMaterial.swift */; };
+		4F0BDB1EE88A66EFD755DC52 /* ProjectStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 754B0957DFF94A65EC922999 /* ProjectStore.swift */; };
+		5387DEE154A1CA16A58390D2 /* RFAccessPoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157ACE86D03026A35404B904 /* RFAccessPoint.swift */; };
+		5390CBB37E1BB9C7930D2F3D /* PlanLayers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F574D717C902C45D4E35E2CE /* PlanLayers.swift */; };
+		568EE6E9D606B0C5BB95895E /* SignalScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = B891E8767F71C95365FED2EF /* SignalScale.swift */; };
+		5ADB0792BD9A1319758A2ED8 /* MeshPlannerCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 913F90AFCBFFB613F793D6F7 /* MeshPlannerCore.framework */; };
+		5C67AEDEBB4F99B6D926D430 /* PlacementOptimizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAB94F385D4D42C7DA5B15FA /* PlacementOptimizer.swift */; };
+		62BE34F29ABB02FF0DBDCC3C /* RoomPlanExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D537F2E0CA74372CC205E1DC /* RoomPlanExtraction.swift */; };
+		63F39039A1AE89DD1A55068F /* SupportLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EB74AEBF106744CFB15F929 /* SupportLinks.swift */; };
+		669492B5DE6CE503E2114B5E /* SignalDebugLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88FB08857B99BA1AA9E28ADA /* SignalDebugLogger.swift */; };
+		66A7393DE13BF1EFF7FAB58C /* AppMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D65432947EB22A0028551C /* AppMain.swift */; };
+		698CAC4AA459567E70B5191F /* RoomScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8A14F2AE83C42381D6C95D8 /* RoomScanView.swift */; };
+		6C3FFF8D4F7985D28524BE2E /* NetworkProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C733C1AE06F72C2AC098999 /* NetworkProfile.swift */; };
+		6D2FC511896D7F99103ABB6D /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C1AB096449BE10EA64DBB837 /* PrivacyInfo.xcprivacy */; };
+		7670C541E6328E3183B2F265 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 908DA9729CDB1B2E2A64EC8F /* Assets.xcassets */; };
+		807D46F71FEAEAFC683D8BA0 /* ExportFilename.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8966A7B2891EEC7BCA9A04C /* ExportFilename.swift */; };
+		80ECDC30196D23935A504266 /* ReportRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6EE53A6E337F4AF1FC88C12 /* ReportRenderer.swift */; };
+		8A26E8F9822BDC8C5AEBC182 /* Glass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1647183B001709FFC83536C1 /* Glass.swift */; };
+		90C6CC04C49E3D557BF7B470 /* SignalLegend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BCD0CC298530173CFCB8929 /* SignalLegend.swift */; };
+		94CDC1724F8926E744664FFE /* SignalField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AA02633FAE497A433E7F67A /* SignalField.swift */; };
+		9CDAD790D1A198405DAF7E20 /* MapScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFDA997A9250834422B86034 /* MapScreen.swift */; };
+		9D00BA0142142361500355A1 /* SignalStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49EBA4DBCFA381F594923BF7 /* SignalStyle.swift */; };
+		A114B28AF84A2F71DEF9C78E /* FloorplanProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1412939FE64B21E3AEBAC9B4 /* FloorplanProject.swift */; };
+		A8CB042E6A4B68DF1BD2B615 /* MeshPlannerCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 913F90AFCBFFB613F793D6F7 /* MeshPlannerCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		AD88E75ED53915BF3A539946 /* ProjectDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EDFA4710D7EC688503055FB /* ProjectDocument.swift */; };
+		AE715A414DE28E264408397D /* ProjectValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74F43B167F97CF6FB030A69A /* ProjectValidation.swift */; };
+		B24B1BC976209A4EECCFED9E /* Calibrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88B2F1ECC8C1880E765D224E /* Calibrator.swift */; };
+		BA48EEA8E43CF4179651AE57 /* LinkRateModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9379D6596E59C32334C92823 /* LinkRateModel.swift */; };
+		CCE8FFF7F99EC11864928782 /* DefaultApartmentFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C0DA0BFC8D2918BC51E868D /* DefaultApartmentFixture.swift */; };
+		CE2ED073D91C03343EA49C53 /* RFBand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 463F89E4F8DD7BD937B404CE /* RFBand.swift */; };
+		CEFDBCF0E0D35D6141317B91 /* PlanTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAC63DB8AE22B6B0F05DDE98 /* PlanTransform.swift */; };
+		D5080383E11FF94C14856DEB /* ARWalkthroughView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7B888BF6CDF456B0FBEC07F /* ARWalkthroughView.swift */; };
+		D563674119ADA074F2FF683F /* SignalDataExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3961C4EDBA4AA033896C2C30 /* SignalDataExporter.swift */; };
+		E3270EAE254821C1815FC9BA /* MeshPlannerUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D39F8FF843426860E3D1DE75 /* MeshPlannerUI.framework */; };
+		E96982853FA2C6FE318B4078 /* EquipmentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4637CB0725A661FF08CBF3F2 /* EquipmentSheet.swift */; };
+		EA82905C8AEF22FBD8AA15A2 /* InspectorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD87B92833A823E51E9984ED /* InspectorSheet.swift */; };
+		ECF437DBD2C28DB23EBCA36C /* RoomLabelLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA76C9B44ACE702884A534A8 /* RoomLabelLayout.swift */; };
+		F274924522BEF8934C6D7C9C /* ProjectRepair.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF296D7EAF6F211DA3319E65 /* ProjectRepair.swift */; };
+		F33D9693A48AAD6A6A7D4732 /* ScanController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18E8BC0CE143C7BD5B5BE2F5 /* ScanController.swift */; };
+		F3C76E84B7CC5C5AC0C6D236 /* CalibrationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 982E4C8C2FA08756B92B0583 /* CalibrationSheet.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		064D3CD0709139DE5BD57630 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 45DD9242F1F6CAE08F8C5F8D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 08B3555349D77F8469893227;
+			remoteInfo = MeshPlannerCore;
+		};
+		2D76067783C65252C34A9CCF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 45DD9242F1F6CAE08F8C5F8D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 958B5520EF18CCC1B744630F;
+			remoteInfo = MeshPlanner;
+		};
+		438C3BBE6EB959359DBDAC48 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 45DD9242F1F6CAE08F8C5F8D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 08B3555349D77F8469893227;
+			remoteInfo = MeshPlannerCore;
+		};
+		45553D5491615ADD9122ACC7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 45DD9242F1F6CAE08F8C5F8D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A240D340E213DE9B554BC798;
+			remoteInfo = MeshPlannerUI;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		8A8DFEF330D5EE77633B3B4D /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				A8CB042E6A4B68DF1BD2B615 /* MeshPlannerCore.framework in Embed Frameworks */,
+				127FE81AFDC44BABDEAB1582 /* MeshPlannerUI.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		0177416BCF924C878B23D0CD /* RFWallSegment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RFWallSegment.swift; sourceTree = "<group>"; };
+		0AA02633FAE497A433E7F67A /* SignalField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalField.swift; sourceTree = "<group>"; };
+		0BCD0CC298530173CFCB8929 /* SignalLegend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalLegend.swift; sourceTree = "<group>"; };
+		0CE7C74753CE39153A18A335 /* RFPathResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RFPathResult.swift; sourceTree = "<group>"; };
+		1412939FE64B21E3AEBAC9B4 /* FloorplanProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloorplanProject.swift; sourceTree = "<group>"; };
+		157ACE86D03026A35404B904 /* RFAccessPoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RFAccessPoint.swift; sourceTree = "<group>"; };
+		1647183B001709FFC83536C1 /* Glass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Glass.swift; sourceTree = "<group>"; };
+		18E8BC0CE143C7BD5B5BE2F5 /* ScanController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanController.swift; sourceTree = "<group>"; };
+		24B354BBCB9EFEEBF5C765F6 /* MeshPlannerUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MeshPlannerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		363617133683857B3489F9B6 /* OptimizerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptimizerSheet.swift; sourceTree = "<group>"; };
+		3961C4EDBA4AA033896C2C30 /* SignalDataExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalDataExporter.swift; sourceTree = "<group>"; };
+		4637CB0725A661FF08CBF3F2 /* EquipmentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentSheet.swift; sourceTree = "<group>"; };
+		463F89E4F8DD7BD937B404CE /* RFBand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RFBand.swift; sourceTree = "<group>"; };
+		49B56DCD98CE35F7A136DEA7 /* RoomInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomInfo.swift; sourceTree = "<group>"; };
+		49EBA4DBCFA381F594923BF7 /* SignalStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalStyle.swift; sourceTree = "<group>"; };
+		5B6B0534CB2AF0516594F294 /* FloorplanCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloorplanCanvas.swift; sourceTree = "<group>"; };
+		5EDFA4710D7EC688503055FB /* ProjectDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectDocument.swift; sourceTree = "<group>"; };
+		60F5DB4E277D1681A45D7ADF /* FloorplanViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloorplanViewModel.swift; sourceTree = "<group>"; };
+		6EB74AEBF106744CFB15F929 /* SupportLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportLinks.swift; sourceTree = "<group>"; };
+		6ED36F8FB6A1A15B8E4B98EA /* MeshPlannerUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshPlannerUITests.swift; sourceTree = "<group>"; };
+		74F43B167F97CF6FB030A69A /* ProjectValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectValidation.swift; sourceTree = "<group>"; };
+		754B0957DFF94A65EC922999 /* ProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStore.swift; sourceTree = "<group>"; };
+		79122F086B6CD446F60F36B0 /* RFPropagationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RFPropagationEngine.swift; sourceTree = "<group>"; };
+		84079B1D7EEDA3E063F05643 /* RFMaterial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RFMaterial.swift; sourceTree = "<group>"; };
+		88B2F1ECC8C1880E765D224E /* Calibrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Calibrator.swift; sourceTree = "<group>"; };
+		88FB08857B99BA1AA9E28ADA /* SignalDebugLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalDebugLogger.swift; sourceTree = "<group>"; };
+		8C0DA0BFC8D2918BC51E868D /* DefaultApartmentFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultApartmentFixture.swift; sourceTree = "<group>"; };
+		8D131609C2411898BC08AD30 /* Geometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Geometry.swift; sourceTree = "<group>"; };
+		908DA9729CDB1B2E2A64EC8F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		913F90AFCBFFB613F793D6F7 /* MeshPlannerCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = MeshPlannerCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		9379D6596E59C32334C92823 /* LinkRateModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkRateModel.swift; sourceTree = "<group>"; };
+		982E4C8C2FA08756B92B0583 /* CalibrationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationSheet.swift; sourceTree = "<group>"; };
+		9C733C1AE06F72C2AC098999 /* NetworkProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkProfile.swift; sourceTree = "<group>"; };
+		A0D65432947EB22A0028551C /* AppMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppMain.swift; sourceTree = "<group>"; };
+		A6080C120CF8A97AA2FB5D65 /* SupportSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportSheets.swift; sourceTree = "<group>"; };
+		A8966A7B2891EEC7BCA9A04C /* ExportFilename.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportFilename.swift; sourceTree = "<group>"; };
+		AA76C9B44ACE702884A534A8 /* RoomLabelLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomLabelLayout.swift; sourceTree = "<group>"; };
+		AAB94F385D4D42C7DA5B15FA /* PlacementOptimizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacementOptimizer.swift; sourceTree = "<group>"; };
+		AAC63DB8AE22B6B0F05DDE98 /* PlanTransform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanTransform.swift; sourceTree = "<group>"; };
+		AE935ED933BAA7F7E12AB2EF /* ProjectsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsHomeView.swift; sourceTree = "<group>"; };
+		AF8C21C2DD80834A544E4133 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		B891E8767F71C95365FED2EF /* SignalScale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalScale.swift; sourceTree = "<group>"; };
+		B8A14F2AE83C42381D6C95D8 /* RoomScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomScanView.swift; sourceTree = "<group>"; };
+		C1AB096449BE10EA64DBB837 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		C1D6CF5EF6BBC2E8EE89526A /* MeshPlanner.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MeshPlanner.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C7966741FCF032C50DD7F49C /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
+		C7B888BF6CDF456B0FBEC07F /* ARWalkthroughView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARWalkthroughView.swift; sourceTree = "<group>"; };
+		D39F8FF843426860E3D1DE75 /* MeshPlannerUI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = MeshPlannerUI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		D537F2E0CA74372CC205E1DC /* RoomPlanExtraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomPlanExtraction.swift; sourceTree = "<group>"; };
+		D8E7AB8E53A39AA87C5253F9 /* BackhaulPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackhaulPlanner.swift; sourceTree = "<group>"; };
+		DF296D7EAF6F211DA3319E65 /* ProjectRepair.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRepair.swift; sourceTree = "<group>"; };
+		E30F8F2A4758C602E4E55988 /* RoomRegionDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomRegionDetector.swift; sourceTree = "<group>"; };
+		E6EE53A6E337F4AF1FC88C12 /* ReportRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportRenderer.swift; sourceTree = "<group>"; };
+		E738BA3B99984057FEDBAB81 /* RoomPlanConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomPlanConverter.swift; sourceTree = "<group>"; };
+		EFDA997A9250834422B86034 /* MapScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapScreen.swift; sourceTree = "<group>"; };
+		F574D717C902C45D4E35E2CE /* PlanLayers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanLayers.swift; sourceTree = "<group>"; };
+		FD87B92833A823E51E9984ED /* InspectorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorSheet.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		020912DC35E852923E2631AD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3A63236B84516F78776624CD /* MeshPlannerCore.framework in Frameworks */,
+				E3270EAE254821C1815FC9BA /* MeshPlannerUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C7CB803D201B9F01A492045D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5ADB0792BD9A1319758A2ED8 /* MeshPlannerCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		018F0ECA0EEBF0D35D9B9FB5 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				8800484347AE95562E6140A1 /* MeshPlannerUITests */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		046A167ADF6B2319890C8F39 /* Geometry */ = {
+			isa = PBXGroup;
+			children = (
+				8D131609C2411898BC08AD30 /* Geometry.swift */,
+				AA76C9B44ACE702884A534A8 /* RoomLabelLayout.swift */,
+				E30F8F2A4758C602E4E55988 /* RoomRegionDetector.swift */,
+			);
+			path = Geometry;
+			sourceTree = "<group>";
+		};
+		072E5ACBE632A141F9CFF2CE = {
+			isa = PBXGroup;
+			children = (
+				3A1CDA47222F72B98C4ED0DC /* Resources */,
+				19CA6FD780494101B7ACD691 /* Sources */,
+				018F0ECA0EEBF0D35D9B9FB5 /* Tests */,
+				A3D262579B51A21111978B10 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		0C33096FBDB3302CF92C8920 /* MeshPlannerCore */ = {
+			isa = PBXGroup;
+			children = (
+				73B2FE044CDB5A64237D3EF5 /* Converters */,
+				94A875A84D72F6EBD8325FFD /* Engine */,
+				046A167ADF6B2319890C8F39 /* Geometry */,
+				D56D2ABE3F92EF6A06261B5E /* Models */,
+				76C6396E0F34FF23A2515E88 /* Serialization */,
+				ADC30BD46C39D48E6D3D1B20 /* ViewModels */,
+			);
+			path = MeshPlannerCore;
+			sourceTree = "<group>";
+		};
+		19CA6FD780494101B7ACD691 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				0C33096FBDB3302CF92C8920 /* MeshPlannerCore */,
+				6E3B6DC93F834593DE179C2D /* MeshPlannerUI */,
+				AA138C7DA98015A27650C790 /* SignalApp */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		3A1CDA47222F72B98C4ED0DC /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				908DA9729CDB1B2E2A64EC8F /* Assets.xcassets */,
+				AF8C21C2DD80834A544E4133 /* Info.plist */,
+				C1AB096449BE10EA64DBB837 /* PrivacyInfo.xcprivacy */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		4C0833B52B31D19E29736544 /* AR */ = {
+			isa = PBXGroup;
+			children = (
+				C7B888BF6CDF456B0FBEC07F /* ARWalkthroughView.swift */,
+			);
+			path = AR;
+			sourceTree = "<group>";
+		};
+		6CDC57F2381C9477320EE05F /* Style */ = {
+			isa = PBXGroup;
+			children = (
+				1647183B001709FFC83536C1 /* Glass.swift */,
+				5EDFA4710D7EC688503055FB /* ProjectDocument.swift */,
+				49EBA4DBCFA381F594923BF7 /* SignalStyle.swift */,
+				6EB74AEBF106744CFB15F929 /* SupportLinks.swift */,
+			);
+			path = Style;
+			sourceTree = "<group>";
+		};
+		6D8A5D180E7BEA99AF63C9BC /* Map */ = {
+			isa = PBXGroup;
+			children = (
+				5B6B0534CB2AF0516594F294 /* FloorplanCanvas.swift */,
+				EFDA997A9250834422B86034 /* MapScreen.swift */,
+				F574D717C902C45D4E35E2CE /* PlanLayers.swift */,
+				AAC63DB8AE22B6B0F05DDE98 /* PlanTransform.swift */,
+				0BCD0CC298530173CFCB8929 /* SignalLegend.swift */,
+			);
+			path = Map;
+			sourceTree = "<group>";
+		};
+		6E3B6DC93F834593DE179C2D /* MeshPlannerUI */ = {
+			isa = PBXGroup;
+			children = (
+				C7966741FCF032C50DD7F49C /* AppRootView.swift */,
+				4C0833B52B31D19E29736544 /* AR */,
+				85B3B2E971162D2DFA814491 /* Home */,
+				6D8A5D180E7BEA99AF63C9BC /* Map */,
+				E11ADD3157DF46E7D9F9AF27 /* Report */,
+				ED0FF7B4C22AE69481524150 /* Scan */,
+				F48A0DA8837191DE9E93EDA3 /* Sheets */,
+				6CDC57F2381C9477320EE05F /* Style */,
+			);
+			path = MeshPlannerUI;
+			sourceTree = "<group>";
+		};
+		73B2FE044CDB5A64237D3EF5 /* Converters */ = {
+			isa = PBXGroup;
+			children = (
+				DF296D7EAF6F211DA3319E65 /* ProjectRepair.swift */,
+				E738BA3B99984057FEDBAB81 /* RoomPlanConverter.swift */,
+			);
+			path = Converters;
+			sourceTree = "<group>";
+		};
+		76C6396E0F34FF23A2515E88 /* Serialization */ = {
+			isa = PBXGroup;
+			children = (
+				A8966A7B2891EEC7BCA9A04C /* ExportFilename.swift */,
+				754B0957DFF94A65EC922999 /* ProjectStore.swift */,
+				74F43B167F97CF6FB030A69A /* ProjectValidation.swift */,
+				3961C4EDBA4AA033896C2C30 /* SignalDataExporter.swift */,
+				88FB08857B99BA1AA9E28ADA /* SignalDebugLogger.swift */,
+			);
+			path = Serialization;
+			sourceTree = "<group>";
+		};
+		85B3B2E971162D2DFA814491 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				AE935ED933BAA7F7E12AB2EF /* ProjectsHomeView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		8800484347AE95562E6140A1 /* MeshPlannerUITests */ = {
+			isa = PBXGroup;
+			children = (
+				6ED36F8FB6A1A15B8E4B98EA /* MeshPlannerUITests.swift */,
+			);
+			path = MeshPlannerUITests;
+			sourceTree = "<group>";
+		};
+		94A875A84D72F6EBD8325FFD /* Engine */ = {
+			isa = PBXGroup;
+			children = (
+				D8E7AB8E53A39AA87C5253F9 /* BackhaulPlanner.swift */,
+				88B2F1ECC8C1880E765D224E /* Calibrator.swift */,
+				9379D6596E59C32334C92823 /* LinkRateModel.swift */,
+				AAB94F385D4D42C7DA5B15FA /* PlacementOptimizer.swift */,
+				79122F086B6CD446F60F36B0 /* RFPropagationEngine.swift */,
+				0AA02633FAE497A433E7F67A /* SignalField.swift */,
+			);
+			path = Engine;
+			sourceTree = "<group>";
+		};
+		A3D262579B51A21111978B10 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C1D6CF5EF6BBC2E8EE89526A /* MeshPlanner.app */,
+				913F90AFCBFFB613F793D6F7 /* MeshPlannerCore.framework */,
+				D39F8FF843426860E3D1DE75 /* MeshPlannerUI.framework */,
+				24B354BBCB9EFEEBF5C765F6 /* MeshPlannerUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA138C7DA98015A27650C790 /* SignalApp */ = {
+			isa = PBXGroup;
+			children = (
+				A0D65432947EB22A0028551C /* AppMain.swift */,
+			);
+			path = SignalApp;
+			sourceTree = "<group>";
+		};
+		ADC30BD46C39D48E6D3D1B20 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				60F5DB4E277D1681A45D7ADF /* FloorplanViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		D56D2ABE3F92EF6A06261B5E /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				8C0DA0BFC8D2918BC51E868D /* DefaultApartmentFixture.swift */,
+				1412939FE64B21E3AEBAC9B4 /* FloorplanProject.swift */,
+				9C733C1AE06F72C2AC098999 /* NetworkProfile.swift */,
+				157ACE86D03026A35404B904 /* RFAccessPoint.swift */,
+				463F89E4F8DD7BD937B404CE /* RFBand.swift */,
+				84079B1D7EEDA3E063F05643 /* RFMaterial.swift */,
+				0CE7C74753CE39153A18A335 /* RFPathResult.swift */,
+				0177416BCF924C878B23D0CD /* RFWallSegment.swift */,
+				49B56DCD98CE35F7A136DEA7 /* RoomInfo.swift */,
+				B891E8767F71C95365FED2EF /* SignalScale.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		E11ADD3157DF46E7D9F9AF27 /* Report */ = {
+			isa = PBXGroup;
+			children = (
+				E6EE53A6E337F4AF1FC88C12 /* ReportRenderer.swift */,
+			);
+			path = Report;
+			sourceTree = "<group>";
+		};
+		ED0FF7B4C22AE69481524150 /* Scan */ = {
+			isa = PBXGroup;
+			children = (
+				D537F2E0CA74372CC205E1DC /* RoomPlanExtraction.swift */,
+				B8A14F2AE83C42381D6C95D8 /* RoomScanView.swift */,
+				18E8BC0CE143C7BD5B5BE2F5 /* ScanController.swift */,
+			);
+			path = Scan;
+			sourceTree = "<group>";
+		};
+		F48A0DA8837191DE9E93EDA3 /* Sheets */ = {
+			isa = PBXGroup;
+			children = (
+				982E4C8C2FA08756B92B0583 /* CalibrationSheet.swift */,
+				4637CB0725A661FF08CBF3F2 /* EquipmentSheet.swift */,
+				FD87B92833A823E51E9984ED /* InspectorSheet.swift */,
+				363617133683857B3489F9B6 /* OptimizerSheet.swift */,
+				A6080C120CF8A97AA2FB5D65 /* SupportSheets.swift */,
+			);
+			path = Sheets;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		08B3555349D77F8469893227 /* MeshPlannerCore */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 76BB3610CC4EE0C11E6A8C11 /* Build configuration list for PBXNativeTarget "MeshPlannerCore" */;
+			buildPhases = (
+				F1202191EB45E0E4ECFA78AD /* Sources */,
+				0877D472E115E3232BF8BBE0 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MeshPlannerCore;
+			packageProductDependencies = (
+			);
+			productName = MeshPlannerCore;
+			productReference = 913F90AFCBFFB613F793D6F7 /* MeshPlannerCore.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		958B5520EF18CCC1B744630F /* MeshPlanner */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2073EE2549D8DFBB60D8724F /* Build configuration list for PBXNativeTarget "MeshPlanner" */;
+			buildPhases = (
+				7A1E5E2995FA2F7D3DFF2E1B /* Sources */,
+				BF8A88DE8ABFF1A66E5B9675 /* Resources */,
+				020912DC35E852923E2631AD /* Frameworks */,
+				8A8DFEF330D5EE77633B3B4D /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4173FACDFEDEED14E9D3DDDC /* PBXTargetDependency */,
+				7C611852D89BC24282C06A93 /* PBXTargetDependency */,
+			);
+			name = MeshPlanner;
+			packageProductDependencies = (
+			);
+			productName = MeshPlanner;
+			productReference = C1D6CF5EF6BBC2E8EE89526A /* MeshPlanner.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A0DD9FFF495435F60192E47A /* MeshPlannerUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F46FC4D6D3EEFD74E49EF2F9 /* Build configuration list for PBXNativeTarget "MeshPlannerUITests" */;
+			buildPhases = (
+				A241907FE45C34D2629562D5 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B5F0A0E2BC436033BDCCE64E /* PBXTargetDependency */,
+			);
+			name = MeshPlannerUITests;
+			packageProductDependencies = (
+			);
+			productName = MeshPlannerUITests;
+			productReference = 24B354BBCB9EFEEBF5C765F6 /* MeshPlannerUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		A240D340E213DE9B554BC798 /* MeshPlannerUI */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7F68644EE87CD2040336E8E6 /* Build configuration list for PBXNativeTarget "MeshPlannerUI" */;
+			buildPhases = (
+				B6C776209F12601983D8C6F5 /* Sources */,
+				C7CB803D201B9F01A492045D /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				22FE71D3874A509345371AC5 /* PBXTargetDependency */,
+			);
+			name = MeshPlannerUI;
+			packageProductDependencies = (
+			);
+			productName = MeshPlannerUI;
+			productReference = D39F8FF843426860E3D1DE75 /* MeshPlannerUI.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		45DD9242F1F6CAE08F8C5F8D /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					08B3555349D77F8469893227 = {
+						DevelopmentTeam = 677L8TYNN9;
+						ProvisioningStyle = Automatic;
+					};
+					958B5520EF18CCC1B744630F = {
+						DevelopmentTeam = 677L8TYNN9;
+						ProvisioningStyle = Automatic;
+					};
+					A0DD9FFF495435F60192E47A = {
+						DevelopmentTeam = 677L8TYNN9;
+						ProvisioningStyle = Automatic;
+						TestTargetID = 958B5520EF18CCC1B744630F;
+					};
+					A240D340E213DE9B554BC798 = {
+						DevelopmentTeam = 677L8TYNN9;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 6E034252C5D6A19BC5407F5E /* Build configuration list for PBXProject "MeshPlanner" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 072E5ACBE632A141F9CFF2CE;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A3D262579B51A21111978B10 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				08B3555349D77F8469893227 /* MeshPlannerCore */,
+				A240D340E213DE9B554BC798 /* MeshPlannerUI */,
+				958B5520EF18CCC1B744630F /* MeshPlanner */,
+				A0DD9FFF495435F60192E47A /* MeshPlannerUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		0877D472E115E3232BF8BBE0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6D2FC511896D7F99103ABB6D /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BF8A88DE8ABFF1A66E5B9675 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7670C541E6328E3183B2F265 /* Assets.xcassets in Resources */,
+				3537FF040E256439370EC962 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		7A1E5E2995FA2F7D3DFF2E1B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				66A7393DE13BF1EFF7FAB58C /* AppMain.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A241907FE45C34D2629562D5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				084FE28B5F8FA04CC609F6DE /* MeshPlannerUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B6C776209F12601983D8C6F5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D5080383E11FF94C14856DEB /* ARWalkthroughView.swift in Sources */,
+				09602A6900D7C772F738EB62 /* AppRootView.swift in Sources */,
+				F3C76E84B7CC5C5AC0C6D236 /* CalibrationSheet.swift in Sources */,
+				E96982853FA2C6FE318B4078 /* EquipmentSheet.swift in Sources */,
+				400752812DC9013D8E012420 /* FloorplanCanvas.swift in Sources */,
+				8A26E8F9822BDC8C5AEBC182 /* Glass.swift in Sources */,
+				EA82905C8AEF22FBD8AA15A2 /* InspectorSheet.swift in Sources */,
+				9CDAD790D1A198405DAF7E20 /* MapScreen.swift in Sources */,
+				196F4D06DAFDCA8D8D38D0DF /* OptimizerSheet.swift in Sources */,
+				5390CBB37E1BB9C7930D2F3D /* PlanLayers.swift in Sources */,
+				CEFDBCF0E0D35D6141317B91 /* PlanTransform.swift in Sources */,
+				AD88E75ED53915BF3A539946 /* ProjectDocument.swift in Sources */,
+				4940A4DEA45117A24247CCA6 /* ProjectsHomeView.swift in Sources */,
+				80ECDC30196D23935A504266 /* ReportRenderer.swift in Sources */,
+				62BE34F29ABB02FF0DBDCC3C /* RoomPlanExtraction.swift in Sources */,
+				698CAC4AA459567E70B5191F /* RoomScanView.swift in Sources */,
+				F33D9693A48AAD6A6A7D4732 /* ScanController.swift in Sources */,
+				90C6CC04C49E3D557BF7B470 /* SignalLegend.swift in Sources */,
+				9D00BA0142142361500355A1 /* SignalStyle.swift in Sources */,
+				63F39039A1AE89DD1A55068F /* SupportLinks.swift in Sources */,
+				202CFEE074203831431FDA32 /* SupportSheets.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F1202191EB45E0E4ECFA78AD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2F31FDB864D75DA734294FF4 /* BackhaulPlanner.swift in Sources */,
+				B24B1BC976209A4EECCFED9E /* Calibrator.swift in Sources */,
+				CCE8FFF7F99EC11864928782 /* DefaultApartmentFixture.swift in Sources */,
+				807D46F71FEAEAFC683D8BA0 /* ExportFilename.swift in Sources */,
+				A114B28AF84A2F71DEF9C78E /* FloorplanProject.swift in Sources */,
+				1FD82C8AD30D057635F5E723 /* FloorplanViewModel.swift in Sources */,
+				35B0768157269661C0251A08 /* Geometry.swift in Sources */,
+				BA48EEA8E43CF4179651AE57 /* LinkRateModel.swift in Sources */,
+				6C3FFF8D4F7985D28524BE2E /* NetworkProfile.swift in Sources */,
+				5C67AEDEBB4F99B6D926D430 /* PlacementOptimizer.swift in Sources */,
+				F274924522BEF8934C6D7C9C /* ProjectRepair.swift in Sources */,
+				4F0BDB1EE88A66EFD755DC52 /* ProjectStore.swift in Sources */,
+				AE715A414DE28E264408397D /* ProjectValidation.swift in Sources */,
+				5387DEE154A1CA16A58390D2 /* RFAccessPoint.swift in Sources */,
+				CE2ED073D91C03343EA49C53 /* RFBand.swift in Sources */,
+				4ADAAAA643F84DC436AB0253 /* RFMaterial.swift in Sources */,
+				486037D4D1DA3245F1255947 /* RFPathResult.swift in Sources */,
+				1E707A9C4F6B467C1BCA6759 /* RFPropagationEngine.swift in Sources */,
+				3F95453ABB04D7D0B556D9F8 /* RFWallSegment.swift in Sources */,
+				12ACDBFCB129A3273AD12EAD /* RoomInfo.swift in Sources */,
+				ECF437DBD2C28DB23EBCA36C /* RoomLabelLayout.swift in Sources */,
+				1CFF7AC1F0886EA9DE3BE770 /* RoomPlanConverter.swift in Sources */,
+				41948DD94BF68C58A812806E /* RoomRegionDetector.swift in Sources */,
+				D563674119ADA074F2FF683F /* SignalDataExporter.swift in Sources */,
+				669492B5DE6CE503E2114B5E /* SignalDebugLogger.swift in Sources */,
+				94CDC1724F8926E744664FFE /* SignalField.swift in Sources */,
+				568EE6E9D606B0C5BB95895E /* SignalScale.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		22FE71D3874A509345371AC5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 08B3555349D77F8469893227 /* MeshPlannerCore */;
+			targetProxy = 438C3BBE6EB959359DBDAC48 /* PBXContainerItemProxy */;
+		};
+		4173FACDFEDEED14E9D3DDDC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 08B3555349D77F8469893227 /* MeshPlannerCore */;
+			targetProxy = 064D3CD0709139DE5BD57630 /* PBXContainerItemProxy */;
+		};
+		7C611852D89BC24282C06A93 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A240D340E213DE9B554BC798 /* MeshPlannerUI */;
+			targetProxy = 45553D5491615ADD9122ACC7 /* PBXContainerItemProxy */;
+		};
+		B5F0A0E2BC436033BDCCE64E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 958B5520EF18CCC1B744630F /* MeshPlanner */;
+			targetProxy = 2D76067783C65252C34A9CCF /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		02A6C10A18C044C09B6D80BF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				ENABLE_PREVIEWS = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.silviogodinho.signal;
+				PRODUCT_NAME = MeshPlanner;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		173CD80057F73ED40540C11D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 3;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleShortVersionString = "$(MARKETING_VERSION)";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.silviogodinho.SignalCore;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		1FEC27BCDE805B1E14263970 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.silviogodinho.SignalUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = MeshPlanner;
+			};
+			name = Release;
+		};
+		36DA40949E6985163B33D8C1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				ENABLE_PREVIEWS = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.silviogodinho.signal;
+				PRODUCT_NAME = MeshPlanner;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		6A19963FF1C89BB44A39FBEA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 3;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 677L8TYNN9;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		878C616323614D7ADE7E2E21 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 3;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleShortVersionString = "$(MARKETING_VERSION)";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.silviogodinho.SignalCore;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		9C608BDFD961A5D6EE0483A7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 3;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 677L8TYNN9;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		9E72B6B857E9F2C7AB7FA8AB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 3;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleShortVersionString = "$(MARKETING_VERSION)";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.silviogodinho.SignalUI;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		C3E5B6F00AF5B567CAE373C1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.silviogodinho.SignalUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = MeshPlanner;
+			};
+			name = Debug;
+		};
+		C625EEA76B193CFEF24F061B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 3;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleShortVersionString = "$(MARKETING_VERSION)";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.silviogodinho.SignalUI;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		2073EE2549D8DFBB60D8724F /* Build configuration list for PBXNativeTarget "MeshPlanner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				36DA40949E6985163B33D8C1 /* Debug */,
+				02A6C10A18C044C09B6D80BF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		6E034252C5D6A19BC5407F5E /* Build configuration list for PBXProject "MeshPlanner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6A19963FF1C89BB44A39FBEA /* Debug */,
+				9C608BDFD961A5D6EE0483A7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		76BB3610CC4EE0C11E6A8C11 /* Build configuration list for PBXNativeTarget "MeshPlannerCore" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				878C616323614D7ADE7E2E21 /* Debug */,
+				173CD80057F73ED40540C11D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7F68644EE87CD2040336E8E6 /* Build configuration list for PBXNativeTarget "MeshPlannerUI" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9E72B6B857E9F2C7AB7FA8AB /* Debug */,
+				C625EEA76B193CFEF24F061B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F46FC4D6D3EEFD74E49EF2F9 /* Build configuration list for PBXNativeTarget "MeshPlannerUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C3E5B6F00AF5B567CAE373C1 /* Debug */,
+				1FEC27BCDE805B1E14263970 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 45DD9242F1F6CAE08F8C5F8D /* Project object */;
+}

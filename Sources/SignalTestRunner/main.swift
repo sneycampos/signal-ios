@@ -1,6 +1,6 @@
 import Foundation
 import simd
-import SignalCore
+import MeshPlannerCore
 
 /// Command-line verification and benchmark of the core: `swift run -c release SignalTestRunner`.
 struct Runner {

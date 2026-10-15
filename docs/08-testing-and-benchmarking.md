@@ -30,7 +30,7 @@ To guarantee that the iOS Metal shader and the Swift pure CPU engine yield ident
 
 ```swift
 import XCTest
-@testable import SignalCore
+@testable import MeshPlannerCore
 
 final class ParityAuditTests: XCTestCase {
     func testCPUAndMetalParityAcrossRandomPoints() throws {

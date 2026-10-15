@@ -7,7 +7,7 @@ usage() { cat <<USAGE
 Usage: scripts/bootstrap.sh [--help]
 
 Checks that Xcode 26+ with the iOS 26+ SDK is installed and selected, installs XcodeGen with Homebrew
-when it is missing, and generates Signal.xcodeproj from project.yml. Safe to rerun.
+when it is missing, and generates MeshPlanner.xcodeproj from project.yml. Safe to rerun.
 USAGE
 }
 if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then usage; exit 0; fi

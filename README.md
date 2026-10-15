@@ -86,7 +86,7 @@ Without the scripts:
 
 ```bash
 xcodegen generate
-xcodebuild -project Signal.xcodeproj -scheme Signal \
+xcodebuild -project MeshPlanner.xcodeproj -scheme MeshPlanner \
   -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
@@ -112,7 +112,7 @@ Don't commit your personal team or bundle identifier changes.
 ./scripts/ui-test.sh --headless # run XCUITests without opening the Simulator app window
 ```
 
-Use `./scripts/test.sh` (or `swift test`) for fast inner-loop checks of `SignalCore`. Run `./scripts/ui-test.sh` for full end-to-end UI verification of `SignalUI` and `SignalApp` in the simulator (opens Simulator visibly by default; pass `--headless` to skip opening the Simulator window). Test fixtures are synthetic; never add real scans or photos of a home to the repository.
+Use `./scripts/test.sh` (or `swift test`) for fast inner-loop checks of `MeshPlannerCore`. Run `./scripts/ui-test.sh` for full end-to-end UI verification of `MeshPlannerUI` and `SignalApp` in the simulator (opens Simulator visibly by default; pass `--headless` to skip opening the Simulator window). Test fixtures are synthetic; never add real scans or photos of a home to the repository.
 
 ## Screenshots
 
@@ -148,7 +148,7 @@ All scripts use `set -euo pipefail`, accept `--help`, are safe to rerun, and con
 | `scripts/bootstrap.sh` | Checks Xcode 26+ and the iOS 26 SDK, installs XcodeGen with Homebrew if missing, generates the Xcode project. |
 | `scripts/build.sh` | Simulator or device build (unsigned), Debug or Release, optional run in the simulator with the demo. |
 | `scripts/test.sh` | `swift test`, optionally the verification runner and an app build. |
-| `scripts/ui-test.sh` | End-to-end XCUITest suite (`SignalUITests`) in the iOS Simulator (`--headless` skips opening Simulator). |
+| `scripts/ui-test.sh` | End-to-end XCUITest suite (`MeshPlannerUITests`) in the iOS Simulator (`--headless` skips opening Simulator). |
 | `scripts/screenshots.sh` | App Store screenshots from the demo project, raw and composed. |
 | `scripts/archive.sh` | Signed archive, App Store `.ipa` export, optional upload. |
 | `scripts/common.sh` | Shared helpers, sourced by the others. |
@@ -157,19 +157,19 @@ All scripts use `set -euo pipefail`, accept `--help`, are safe to rerun, and con
 
 | Folder | Contents |
 | :--- | :--- |
-| `Sources/SignalCore` | Platform-independent core: models, propagation engine, signal field, optimizer, backhaul, calibration, RoomPlan converter, persistence and view model. |
-| `Sources/SignalUI` | SwiftUI interface (iOS): projects, scan, map, sheets, AR and report. |
+| `Sources/MeshPlannerCore` | Platform-independent core: models, propagation engine, signal field, optimizer, backhaul, calibration, RoomPlan converter, persistence and view model. |
+| `Sources/MeshPlannerUI` | SwiftUI interface (iOS): projects, scan, map, sheets, AR and report. |
 | `Sources/SignalApp` | App entry point. |
 | `Sources/SignalTestRunner` | Command-line verification and benchmark. |
-| `Tests/SignalCoreTests` | Core tests (Swift Testing). |
-| `Tests/SignalUITests` | End-to-end iOS UI tests (XCUITest). |
+| `Tests/MeshPlannerCoreTests` | Core tests (Swift Testing). |
+| `Tests/MeshPlannerUITests` | End-to-end iOS UI tests (XCUITest). |
 | `Resources/` | Assets and the privacy manifest. |
 | `scripts/` | One-shot build, test, screenshot and release scripts. |
 | `site/` | Static website (landing, privacy, support). |
 | `docs/` | Original specification (01–08), technical review and plan (09), App Store material. |
 | `project.yml` | XcodeGen source of the Xcode project. |
 
-Internal module and target names still use the original working name; this does not affect the app's name.
+The Xcode project, scheme, and modules are named MeshPlanner. The home-screen name stays Mesh Planner.
 
 ## Troubleshooting
 

@@ -1,6 +1,6 @@
 # 09. Revisão técnica e plano de melhorias
 
-> Revisão feita em 26/09/2026 sobre o código completo (SignalCore, SignalUI, SignalApp, testes, docs e projeto Xcode).
+> Revisão feita em 26/09/2026 sobre o código completo (MeshPlannerCore, MeshPlannerUI, SignalApp, testes, docs e projeto Xcode).
 > Objetivo do produto: escanear casas inteiras com LiDAR e encontrar a melhor posição para o roteador e os satélites mesh, com a maior cobertura possível.
 > Os itens de App Store (privacy manifest, launch screen, metadados) ficam para uma etapa posterior e não fazem parte deste plano.
 
@@ -143,21 +143,21 @@ Todos os itens abaixo foram implementados. A verificação automática cobre o n
 
 | Item | Arquivo |
 |---|---|
-| Motor único, tolerâncias, deduplicação, reflexões, andares | `Sources/SignalCore/Engine/RFPropagationEngine.swift` |
-| Campo de sinal, máscara, cobertura por cômodo, isolinhas, heatmap | `Sources/SignalCore/Engine/SignalField.swift` |
-| Taxa e vazão | `Sources/SignalCore/Engine/LinkRateModel.swift` |
-| Backhaul | `Sources/SignalCore/Engine/BackhaulPlanner.swift` |
-| Otimizador | `Sources/SignalCore/Engine/PlacementOptimizer.swift` |
-| Calibração | `Sources/SignalCore/Engine/Calibrator.swift` |
-| Conversor RoomPlan | `Sources/SignalCore/Converters/RoomPlanConverter.swift` |
-| Escala de sinal | `Sources/SignalCore/Models/SignalScale.swift` |
-| Projetos e persistência | `Sources/SignalCore/Models/FloorplanProject.swift`, `Sources/SignalCore/Serialization/ProjectStore.swift` |
-| View model | `Sources/SignalCore/ViewModels/FloorplanViewModel.swift` |
-| Scan multi-cômodo | `Sources/SignalUI/Scan/` |
-| Mapa, legenda, gestos, acessibilidade | `Sources/SignalUI/Map/` |
-| Folhas (inspector, equipamento, otimizador, calibração) | `Sources/SignalUI/Sheets/` |
-| AR | `Sources/SignalUI/AR/ARWalkthroughView.swift` |
-| Relatório PDF | `Sources/SignalUI/Report/ReportRenderer.swift` |
+| Motor único, tolerâncias, deduplicação, reflexões, andares | `Sources/MeshPlannerCore/Engine/RFPropagationEngine.swift` |
+| Campo de sinal, máscara, cobertura por cômodo, isolinhas, heatmap | `Sources/MeshPlannerCore/Engine/SignalField.swift` |
+| Taxa e vazão | `Sources/MeshPlannerCore/Engine/LinkRateModel.swift` |
+| Backhaul | `Sources/MeshPlannerCore/Engine/BackhaulPlanner.swift` |
+| Otimizador | `Sources/MeshPlannerCore/Engine/PlacementOptimizer.swift` |
+| Calibração | `Sources/MeshPlannerCore/Engine/Calibrator.swift` |
+| Conversor RoomPlan | `Sources/MeshPlannerCore/Converters/RoomPlanConverter.swift` |
+| Escala de sinal | `Sources/MeshPlannerCore/Models/SignalScale.swift` |
+| Projetos e persistência | `Sources/MeshPlannerCore/Models/FloorplanProject.swift`, `Sources/MeshPlannerCore/Serialization/ProjectStore.swift` |
+| View model | `Sources/MeshPlannerCore/ViewModels/FloorplanViewModel.swift` |
+| Scan multi-cômodo | `Sources/MeshPlannerUI/Scan/` |
+| Mapa, legenda, gestos, acessibilidade | `Sources/MeshPlannerUI/Map/` |
+| Folhas (inspector, equipamento, otimizador, calibração) | `Sources/MeshPlannerUI/Sheets/` |
+| AR | `Sources/MeshPlannerUI/AR/ARWalkthroughView.swift` |
+| Relatório PDF | `Sources/MeshPlannerUI/Report/ReportRenderer.swift` |
 | Idioma | Texto em inglês no código-fonte (sem String Catalog) |
 
 ## 7. Idioma

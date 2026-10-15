@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Run the end-to-end XCUITest suite (SignalUITests) in the iOS Simulator.
+# Run the end-to-end XCUITest suite (MeshPlannerUITests) in the iOS Simulator.
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
 
 DERIVED="${DERIVED_DATA:-/tmp/mp-uitests-dd}"
-UI_SCHEME="SignalUITests"
+UI_SCHEME="MeshPlannerUITests"
 
 usage() { cat <<USAGE
 Usage: scripts/ui-test.sh [--headless] [--no-generate]
 
   (default)      Generate the project, boot an iPhone simulator, open the
-                 Simulator app visibly, and run the SignalUITests XCUITest suite.
+                 Simulator app visibly, and run the MeshPlannerUITests XCUITest suite.
   --headless     Do not open the Simulator app window.
   --no-generate  Skip xcodegen generate.
 
