@@ -3,7 +3,7 @@ import Testing
 import simd
 @testable import MeshPlannerCore
 
-@Suite("Optimizer never worse")
+@Suite("Optimizer never worse", .serialized)
 struct OptimizerNeverWorseTests {
     @Test func optimizerProposalIsNeverWorseThanCurrentPlacement() throws {
         // 1. Demo apartment fixture with router manually moved to a strong central spot.
@@ -293,6 +293,279 @@ struct OptimizerNeverWorseTests {
         #expect(
             comparison.after.coveredPercent >= comparison.before.coveredPercent,
             "Trial \(trial) on \(project.name) (sats=\(option), existing=\(existingSatCount), lock=\(lockRouter)): after \(comparison.after.coveredPercent)% < before \(comparison.before.coveredPercent)%"
+        )
+    }
+
+    @Test func routerOnlyFromWeakSpotFindsKnownStrongCoverageOnDemoAndScannedFixtures() throws {
+        // Case A: DefaultApartmentFixture — manual placement at (6.0, 5.0) reaches ~88.3% coverage.
+        var demoManual = DefaultApartmentFixture.makeProject()
+        demoManual.accessPoints[0].position = SIMD2<Float>(6.0, 5.0)
+        let manualDummyProposal = PlacementProposal(
+            routerPosition: SIMD2<Float>(6.0, 5.0),
+            satellitePositions: [],
+            recommendedSatelliteCount: 0,
+            estimatedCoverageBySatelliteCount: [88],
+            executionTimeMs: 0
+        )
+        let manualComp = FloorplanViewModel.compare(project: demoManual, proposal: manualDummyProposal, floor: 0)
+        #expect(manualComp.before.coveredPercent >= 87.5)
+
+        // Move router to ~72% spots and a weak corner (~38%), then optimize with 0 satellites.
+        for weakStart in [SIMD2<Float>(3.0, 2.5), SIMD2<Float>(9.5, 4.8), SIMD2<Float>(13.3, 9.3)] {
+            var demo = DefaultApartmentFixture.makeProject()
+            demo.accessPoints[0].position = weakStart
+            demo.accessPoints[0].isLocked = false
+
+            let req = PlacementRequest(
+                walls: demo.walls,
+                rooms: demo.rooms,
+                accessPoints: demo.accessPoints,
+                profile: demo.profile,
+                calibration: demo.calibration,
+                width: demo.width,
+                depth: demo.depth,
+                floor: 0,
+                satellites: .exactly(0),
+                lockRouter: false
+            )
+            let proposal = try #require(PlacementOptimizer.optimize(req))
+            let comp = FloorplanViewModel.compare(project: demo, proposal: proposal, floor: 0)
+            #expect(
+                comp.after.coveredPercent >= 86.5,
+                "Demo router-only from \(weakStart) (\(comp.before.coveredPercent)%) only reached \(comp.after.coveredPercent)%, expected >= 86.5%"
+            )
+            #expect(comp.after.coveredPercent >= manualComp.before.coveredPercent - 1.5)
+        }
+
+        // Case B: Repaired scan fixture — manual placement at (6.0, 5.0) reaches ~90.6% coverage.
+        for weakStart in [SIMD2<Float>(3.0, 2.5), SIMD2<Float>(13.3, 9.3)] {
+            var scanned = ProjectRepair.upgradeIfNeeded(RealScanTests.legacyFixture())
+            scanned.accessPoints[0].position = weakStart
+            scanned.accessPoints[0].isLocked = false
+
+            let req = PlacementRequest(
+                walls: scanned.walls,
+                rooms: scanned.rooms,
+                accessPoints: scanned.accessPoints,
+                profile: scanned.profile,
+                calibration: scanned.calibration,
+                width: scanned.width,
+                depth: scanned.depth,
+                floor: 0,
+                satellites: .exactly(0),
+                lockRouter: false
+            )
+            let proposal = try #require(PlacementOptimizer.optimize(req))
+            let comp = FloorplanViewModel.compare(project: scanned, proposal: proposal, floor: 0)
+            #expect(
+                comp.after.coveredPercent >= 89.0,
+                "Scanned router-only from \(weakStart) (\(comp.before.coveredPercent)%) only reached \(comp.after.coveredPercent)%, expected >= 89.0%"
+            )
+        }
+    }
+
+    @Test func routerOnlyMatchesBruteForceReferenceWithinTolerance() throws {
+        var demo = DefaultApartmentFixture.makeProject()
+        let rooms = demo.rooms(onFloor: 0)
+        let obstacles = Geometry.obstacleFootprints(demo.walls, floor: 0)
+        let floorWalls = demo.walls.filter { $0.floor == 0 && $0.isActive && !$0.material.isTransparent }
+        let model = PropagationModel(walls: demo.walls, band: demo.profile.planningBand, calibration: demo.calibration, floorHeight: demo.profile.floorHeight)
+        let scale = SignalScale(profile: demo.profile)
+        let evalGrid = FieldGrid.covering(width: demo.width, depth: demo.depth, targetCell: 0.2, maxCells: 12_000)
+        let mask = InteriorMask(grid: evalGrid, polygons: rooms.map(\.polygon))
+
+        // Brute-force 0.75 m grid + doorway/room-center reference over the floorplan using the full SignalFieldGenerator (0.2 m, reflections: true).
+        let refGrid = FieldGrid.covering(width: demo.width, depth: demo.depth, targetCell: 0.75, maxCells: 600)
+        var refPoints: [SIMD2<Float>] = [SIMD2(6.0, 5.0), SIMD2(5.8, 5.0), SIMD2(6.2, 5.0)] + rooms.map(\.labelPoint)
+        for row in 0..<refGrid.rows {
+            for col in 0..<refGrid.cols {
+                refPoints.append(refGrid.center(col: col, row: row))
+            }
+        }
+        var bruteForceBestCoverage: Float = 0
+        for p in refPoints {
+            guard rooms.contains(where: { $0.contains(p) }),
+                  PlacementOptimizer.isPlaceable(p, walls: floorWalls, obstacles: obstacles) else { continue }
+            let ap = RFAccessPoint(name: "Router", position: p, txPower: demo.accessPoints[0].txPower, floor: 0)
+            if let field = SignalFieldGenerator.compute(model: model, accessPoints: [ap], floor: 0, mask: mask, scale: scale, reflections: true) {
+                if field.coverage.coveredPercent > bruteForceBestCoverage {
+                    bruteForceBestCoverage = field.coverage.coveredPercent
+                }
+            }
+        }
+        #expect(bruteForceBestCoverage >= 86.0)
+
+        // Start from a weak corner (~38% coverage) and run router-only optimization.
+        demo.accessPoints[0].position = SIMD2<Float>(13.3, 9.3)
+        demo.accessPoints[0].isLocked = false
+        let req = PlacementRequest(
+            walls: demo.walls,
+            rooms: demo.rooms,
+            accessPoints: demo.accessPoints,
+            profile: demo.profile,
+            calibration: demo.calibration,
+            width: demo.width,
+            depth: demo.depth,
+            floor: 0,
+            satellites: .exactly(0),
+            lockRouter: false
+        )
+        let proposal = try #require(PlacementOptimizer.optimize(req))
+        let comp = FloorplanViewModel.compare(project: demo, proposal: proposal, floor: 0)
+        #expect(
+            comp.after.coveredPercent >= bruteForceBestCoverage - 1.5,
+            "Optimizer after (\(comp.after.coveredPercent)%) should be within 1.5% of brute-force reference (\(bruteForceBestCoverage)%)"
+        )
+    }
+
+    @Test @MainActor func lockedSatelliteStaysPutAndUnlockedSatellitesPreserveIdentity() async throws {
+        let base = DefaultApartmentFixture.makeProject()
+        var demo = FloorplanProject(
+            id: UUID().uuidString,
+            name: base.name,
+            width: base.width,
+            depth: base.depth,
+            walls: base.walls,
+            accessPoints: base.accessPoints,
+            rooms: base.rooms,
+            furniture: base.furniture,
+            probe: base.probe
+        )
+        let lockedSat = RFAccessPoint(
+            id: "sat-locked",
+            name: "Pinned Hall Sat",
+            position: SIMD2<Float>(3.5, 5.0),
+            isSatellite: true,
+            floor: 0,
+            backhaul: .wireless,
+            isLocked: true
+        )
+        let unlockedSat = RFAccessPoint(
+            id: "sat-unlocked",
+            name: "Movable Bedroom Sat",
+            position: SIMD2<Float>(12.5, 8.5),
+            isSatellite: true,
+            floor: 0,
+            backhaul: .wireless,
+            isLocked: false
+        )
+        demo.accessPoints.append(contentsOf: [lockedSat, unlockedSat])
+
+        let req = PlacementRequest(
+            walls: demo.walls,
+            rooms: demo.rooms,
+            accessPoints: demo.accessPoints,
+            profile: demo.profile,
+            calibration: demo.calibration,
+            width: demo.width,
+            depth: demo.depth,
+            floor: 0,
+            satellites: .exactly(2),
+            lockRouter: false
+        )
+        let proposal = try #require(PlacementOptimizer.optimize(req))
+        #expect(proposal.satellitePositions.count == 2)
+        #expect(simd_distance(proposal.satellitePositions[0], lockedSat.position) < 1e-3)
+
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ProjectStore(rootDirectory: root)
+        try await store.save(demo)
+
+        let model = FloorplanViewModel(store: store)
+        await model.open(id: demo.id)
+        model.runOptimizer(satellites: .exactly(2), lockRouter: false)
+        let deadline = ContinuousClock.now + .seconds(5)
+        while case .running = model.optimizer, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        if case .ready(let comp) = model.optimizer, !comp.isAlreadyOptimal {
+            model.applyOptimizerResult()
+        }
+        let afterLocked = try #require(model.accessPoint(id: "sat-locked"))
+        let afterUnlocked = try #require(model.accessPoint(id: "sat-unlocked"))
+        #expect(simd_distance(afterLocked.position, lockedSat.position) < 1e-3)
+        #expect(afterLocked.name == "Pinned Hall Sat")
+        #expect(afterUnlocked.name == "Movable Bedroom Sat")
+        await model.close()
+    }
+
+    @Test func optimizerPerformanceBudget() throws {
+        var demo = DefaultApartmentFixture.makeProject()
+        demo.accessPoints[0].position = SIMD2<Float>(3.0, 2.5)
+
+        let req0 = PlacementRequest(
+            walls: demo.walls,
+            rooms: demo.rooms,
+            accessPoints: demo.accessPoints,
+            profile: demo.profile,
+            calibration: demo.calibration,
+            width: demo.width,
+            depth: demo.depth,
+            floor: 0,
+            satellites: .exactly(0),
+            lockRouter: false
+        )
+        let prop0 = try #require(PlacementOptimizer.optimize(req0))
+        #expect(prop0.executionTimeMs < 600, "Router-only took \(prop0.executionTimeMs) ms")
+
+        let reqAuto = PlacementRequest(
+            walls: demo.walls,
+            rooms: demo.rooms,
+            accessPoints: demo.accessPoints,
+            profile: demo.profile,
+            calibration: demo.calibration,
+            width: demo.width,
+            depth: demo.depth,
+            floor: 0,
+            satellites: .automatic,
+            lockRouter: false,
+            maxSatellites: 3
+        )
+        let propAuto = try #require(PlacementOptimizer.optimize(reqAuto))
+        #expect(propAuto.executionTimeMs < 1500, "Automatic (0...3 sats) took \(propAuto.executionTimeMs) ms")
+    }
+
+    @Test func tallFloorLowerHalfOptimalSpotIsFoundWithoutTruncation() throws {
+        // Tall floorplan (10 m × 24 m) wherecandGrid produces > 600 interior points (> maxCandidates = 320).
+        // The upper half (y = 0...12) is a low-importance hallway; the lower half (y = 12...24) has three
+        // bedrooms separated by concrete walls that only open into a lower-half hub (y ≈ 18).
+        // Only a router placed in the lower half (y > 12) can cover the lower bedrooms well.
+        let rooms: [RoomInfo] = [
+            RoomInfo(id: "upper_hall", name: "Upper Gallery", kind: .hallway, polygon: [[0, 0], [10, 0], [10, 12], [0, 12]]),
+            RoomInfo(id: "lower_hub", name: "Lower Living", kind: .livingRoom, polygon: [[3, 12], [7, 12], [7, 24], [3, 24]]),
+            RoomInfo(id: "bed_left", name: "Lower West Bedroom", kind: .bedroom, polygon: [[0, 12], [3, 12], [3, 24], [0, 24]]),
+            RoomInfo(id: "bed_right", name: "Lower East Bedroom", kind: .bedroom, polygon: [[7, 12], [10, 12], [10, 24], [7, 24]])
+        ]
+        // Heavy concrete walls partitioning the upper gallery into small bays and enclosing the lower bedrooms
+        // with open gaps (not .door/.opening) into the lower hub around y = 18.
+        let walls: [RFWallSegment] = [
+            RFWallSegment(p1: [0, 3], p2: [10, 3], material: .concrete),
+            RFWallSegment(p1: [0, 6], p2: [10, 6], material: .concrete),
+            RFWallSegment(p1: [0, 9], p2: [10, 9], material: .concrete),
+            RFWallSegment(p1: [0, 12], p2: [10, 12], material: .concrete),
+            RFWallSegment(p1: [3, 12], p2: [3, 17], material: .concrete),
+            RFWallSegment(p1: [3, 19], p2: [3, 24], material: .concrete),
+            RFWallSegment(p1: [7, 12], p2: [7, 17], material: .concrete),
+            RFWallSegment(p1: [7, 19], p2: [7, 24], material: .concrete)
+        ]
+        let router = RFAccessPoint(name: "Router", position: SIMD2<Float>(5.0, 2.0), floor: 0, isLocked: false)
+        let req = PlacementRequest(
+            walls: walls,
+            rooms: rooms,
+            accessPoints: [router],
+            profile: NetworkProfile(),
+            width: 10,
+            depth: 24,
+            floor: 0,
+            satellites: .exactly(0),
+            lockRouter: false
+        )
+        let proposal = try #require(PlacementOptimizer.optimize(req))
+        #expect(
+            proposal.routerPosition.y > 12.0,
+            "Expected router to move into the lower half (y > 12), but got \(proposal.routerPosition)"
         )
     }
 }

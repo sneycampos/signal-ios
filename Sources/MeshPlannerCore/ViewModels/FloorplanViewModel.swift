@@ -692,7 +692,8 @@ public final class FloorplanViewModel {
             depth: project.depth,
             floor: floor,
             satellites: satellites,
-            lockRouter: lockRouter
+            lockRouter: lockRouter,
+            band: project.selectedBand
         )
         let snapshot = project
         optimizerSnapshot = snapshot
@@ -752,33 +753,74 @@ public final class FloorplanViewModel {
         let proposal = comparison.proposal
         let currentFloor = floor
         mutate(recompute: .full) { p in
-            if let routerIndex = p.accessPoints.firstIndex(where: { !$0.isSatellite && $0.isActive }) ?? p.accessPoints.firstIndex(where: { !$0.isSatellite }) {
-                if p.accessPoints[routerIndex].position != proposal.routerPosition {
-                    p.accessPoints[routerIndex].isLocked = false
-                }
-                p.accessPoints[routerIndex].position = proposal.routerPosition
-            }
-            let satelliteIds = p.accessPoints
-                .filter { $0.isSatellite && $0.floor == currentFloor && $0.isActive }
-                .sorted { ($0.backhaul == .wired ? 0 : 1) < ($1.backhaul == .wired ? 0 : 1) }
-                .map(\.id)
-            for (i, position) in proposal.satellitePositions.enumerated() {
-                if i < satelliteIds.count, let index = p.accessPoints.firstIndex(where: { $0.id == satelliteIds[i] }) {
-                    p.accessPoints[index].position = position
-                } else {
-                    p.accessPoints.append(RFAccessPoint(name: "Satellite \(p.satellites.count + 1)", position: position, isSatellite: true, floor: currentFloor))
-                }
-            }
-            let surplus = Set(satelliteIds.dropFirst(proposal.satellitePositions.count))
-            p.accessPoints.removeAll { surplus.contains($0.id) }
+            p.accessPoints = Self.applyingProposal(proposal, to: p.accessPoints, floor: currentFloor)
         }
         optimizer = .idle
         toast = ToastMessage(text: "Positions applied.", offersUndo: true)
     }
 
+    nonisolated static func applyingProposal(
+        _ proposal: PlacementProposal,
+        to accessPoints: [RFAccessPoint],
+        floor currentFloor: Int
+    ) -> [RFAccessPoint] {
+        var result = accessPoints
+        if let routerIndex = result.firstIndex(where: { !$0.isSatellite && $0.isActive }) ?? result.firstIndex(where: { !$0.isSatellite }) {
+            if result[routerIndex].position != proposal.routerPosition {
+                result[routerIndex].isLocked = false
+            }
+            result[routerIndex].position = proposal.routerPosition
+        }
+        let existing = result
+            .filter { $0.isSatellite && $0.floor == currentFloor && $0.isActive }
+            .sorted { ($0.isLocked ? 0 : 1, $0.backhaul == .wired ? 0 : 1) < ($1.isLocked ? 0 : 1, $1.backhaul == .wired ? 0 : 1) }
+        let keepCount = min(existing.count, proposal.satellitePositions.count)
+        let kept = Array(existing.prefix(keepCount))
+        var unassignedSlots = Set(0..<keepCount)
+        var slotForId: [String: Int] = [:]
+
+        for (slot, sat) in kept.enumerated() where sat.isLocked {
+            slotForId[sat.id] = slot
+            unassignedSlots.remove(slot)
+        }
+        for backhaulType in [BackhaulType.wired, BackhaulType.wireless] {
+            let unlocked = kept.filter { !$0.isLocked && $0.backhaul == backhaulType }
+            var remainingSlots = Set(unassignedSlots.filter { kept[$0].backhaul == backhaulType })
+            for sat in unlocked {
+                if let bestSlot = remainingSlots.min(by: {
+                    simd_distance(sat.position, proposal.satellitePositions[$0]) < simd_distance(sat.position, proposal.satellitePositions[$1])
+                }) {
+                    slotForId[sat.id] = bestSlot
+                    remainingSlots.remove(bestSlot)
+                    unassignedSlots.remove(bestSlot)
+                }
+            }
+        }
+        for sat in kept where slotForId[sat.id] == nil {
+            if let fallbackSlot = unassignedSlots.min() {
+                slotForId[sat.id] = fallbackSlot
+                unassignedSlots.remove(fallbackSlot)
+            }
+        }
+        for sat in kept {
+            if let slot = slotForId[sat.id], let index = result.firstIndex(where: { $0.id == sat.id }) {
+                result[index].position = proposal.satellitePositions[slot]
+            }
+        }
+        if proposal.satellitePositions.count > keepCount {
+            let currentSatCount = result.filter(\.isSatellite).count
+            for (offset, position) in proposal.satellitePositions.dropFirst(keepCount).enumerated() {
+                result.append(RFAccessPoint(name: "Satellite \(currentSatCount + offset + 1)", position: position, isSatellite: true, floor: currentFloor))
+            }
+        }
+        let surplus = Set(existing.dropFirst(keepCount).map(\.id))
+        result.removeAll { surplus.contains($0.id) }
+        return result
+    }
+
     /// Before/after coverage with the full model (direct + reflections), so the numbers match the map.
     nonisolated static func compare(project: FloorplanProject, proposal: PlacementProposal, floor: Int) -> OptimizerComparison {
-        let band = project.profile.planningBand
+        let band = project.profile.supportedBands.contains(project.selectedBand) ? project.selectedBand : project.profile.planningBand
         let scale = SignalScale(profile: project.profile)
         let model = PropagationModel(walls: project.walls, band: band, calibration: project.calibration, floorHeight: project.profile.floorHeight)
         let rooms = project.rooms(onFloor: floor)
@@ -788,16 +830,21 @@ public final class FloorplanViewModel {
         let beforeAPs = project.accessPoints
         let existing = project.accessPoints
             .filter { $0.isSatellite && $0.floor == floor && $0.isActive }
-            .sorted { ($0.backhaul == .wired ? 0 : 1) < ($1.backhaul == .wired ? 0 : 1) }
+            .sorted { ($0.isLocked ? 0 : 1, $0.backhaul == .wired ? 0 : 1) < ($1.isLocked ? 0 : 1, $1.backhaul == .wired ? 0 : 1) }
         let before = SignalFieldGenerator.compute(model: model, accessPoints: beforeAPs, floor: floor, mask: mask, scale: scale)
         let beforeSummary = before?.coverage ?? .empty
         let roomsBefore = before?.roomCoverage(rooms: rooms, accessPoints: beforeAPs) ?? []
 
         let currentRouterPos = (project.accessPoints.first { !$0.isSatellite && $0.isActive } ?? project.router)?.position ?? proposal.routerPosition
         let currentSatPositions = existing.map(\.position)
+        let afterAPs = applyingProposal(proposal, to: project.accessPoints, floor: floor)
+        let afterSatellites = afterAPs.filter { $0.isSatellite && $0.floor == floor && $0.isActive }
         let positionsUnchanged = simd_distance(proposal.routerPosition, currentRouterPos) < 1e-3
-            && proposal.satellitePositions.count == currentSatPositions.count
-            && zip(proposal.satellitePositions, currentSatPositions).allSatisfy { simd_distance($0, $1) < 1e-3 }
+            && afterSatellites.count == existing.count
+            && existing.allSatisfy { oldSat in
+                guard let newSat = afterSatellites.first(where: { $0.id == oldSat.id }) else { return false }
+                return simd_distance(oldSat.position, newSat.position) < 1e-3
+            }
 
         func alreadyOptimalComparison() -> OptimizerComparison {
             let fallbackProposal = PlacementProposal(
@@ -826,15 +873,6 @@ public final class FloorplanViewModel {
             return alreadyOptimalComparison()
         }
 
-        var afterAPs = project.accessPoints.filter { !($0.isSatellite && $0.floor == floor && $0.isActive) }
-        if let r = afterAPs.firstIndex(where: { !$0.isSatellite && $0.isActive }) ?? afterAPs.firstIndex(where: { !$0.isSatellite }) {
-            afterAPs[r].position = proposal.routerPosition
-        }
-        for (i, position) in proposal.satellitePositions.enumerated() {
-            var sat = i < existing.count ? existing[i] : RFAccessPoint(name: "", position: position, isSatellite: true, floor: floor)
-            sat.position = position
-            afterAPs.append(sat)
-        }
         let after = SignalFieldGenerator.compute(model: model, accessPoints: afterAPs, floor: floor, mask: mask, scale: scale)
         let afterSummary = after?.coverage ?? .empty
         let roomsAfter = after?.roomCoverage(rooms: rooms, accessPoints: afterAPs) ?? []

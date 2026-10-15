@@ -16,7 +16,7 @@ struct OptimizerAndCalibrationTests {
         for p in [proposal.routerPosition] + proposal.satellitePositions {
             #expect(project.rooms.contains { $0.contains(p) })
             #expect(!obstacles.contains { Geometry.contains($0, p) })
-            #expect(project.walls.filter { !$0.material.isTransparent }.allSatisfy { $0.distance(to: p) >= 0.2 })
+            #expect(project.walls.filter { !$0.material.isTransparent }.allSatisfy { $0.distance(to: p) >= PlacementOptimizer.wallClearance - 1e-3 })
         }
     }
 

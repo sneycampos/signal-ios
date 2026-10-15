@@ -98,7 +98,10 @@ public struct PropagationModel: Sendable {
     public static let deviceMarginDb: Float = 3
 
     @inline(__always)
-    func effectiveTx(_ ap: RFAccessPoint) -> Float { ap.txPower + calibration.offsetDb - Self.deviceMarginDb }
+    func effectiveTx(txPower: Float) -> Float { txPower + calibration.offsetDb - Self.deviceMarginDb }
+
+    @inline(__always)
+    func effectiveTx(_ ap: RFAccessPoint) -> Float { effectiveTx(txPower: ap.txPower) }
 
     // MARK: Wall crossings
 
@@ -126,10 +129,16 @@ public struct PropagationModel: Sendable {
         let hiZ = max(az, bz) + pad
 
         return blockersByFloor[floor].withUnsafeBufferPointer { walls in
-            withUnsafeTemporaryAllocation(of: WallHit.self, capacity: Self.maxHits) { hits in
+            guard let basePtr = walls.baseAddress else { return 0 }
+            let wallCount = walls.count
+            return withUnsafeTemporaryAllocation(of: WallHit.self, capacity: Self.maxHits) { hits in
+                guard let hitsPtr = hits.baseAddress else { return 0 }
                 var count = 0
                 var total: Float = 0
-                for w in walls {
+                var wIdx = 0
+                while wIdx < wallCount {
+                    let w = basePtr[wIdx]
+                    wIdx += 1
                     if w.index == excluded { continue }
                     if w.maxX < loX || w.minX > hiX || w.maxZ < loZ || w.minZ > hiZ { continue }
                     let denom = rdx * w.dz - rdz * w.dx
@@ -143,34 +152,39 @@ public struct PropagationModel: Sendable {
                     if u < -uTolerance || u > 1 + uTolerance { continue }
 
                     let cosTheta = abs(rdx * w.nx + rdz * w.nz) * invLength
-                    let loss = w.loss * min(1 / max(cosTheta, 1e-4), 2)
+                    let clampedCos = cosTheta > 1e-4 ? cosTheta : 1e-4
+                    let factor = (1 / clampedCos) < 2 ? (1 / clampedCos) : 2
+                    let loss = w.loss * factor
 
                     // Faces of one obstacle count once; structural walls meeting at a joint or corner count once.
                     var merged = false
-                    for k in 0..<count {
-                        let sameObstacle = w.group != 0 && hits[k].group == w.group
-                        let jointOrCorner = w.group == 0 && hits[k].group == 0 && abs(hits[k].t - t) * length < Self.mergeDistance
+                    var k = 0
+                    while k < count {
+                        let hk = hitsPtr[k]
+                        let sameObstacle = w.group != 0 && hk.group == w.group
+                        let jointOrCorner = w.group == 0 && hk.group == 0 && abs(hk.t - t) * length < Self.mergeDistance
                         if sameObstacle || jointOrCorner {
-                            if loss > hits[k].loss {
-                                total += loss - hits[k].loss
-                                hits[k].loss = loss
-                                hits[k].index = w.index
+                            if loss > hk.loss {
+                                total += loss - hk.loss
+                                hitsPtr[k].loss = loss
+                                hitsPtr[k].index = w.index
                             }
                             merged = true
                             break
                         }
+                        k += 1
                     }
                     if !merged {
                         total += loss
                         if count < Self.maxHits {
-                            hits[count] = WallHit(t: t, loss: loss, group: w.group, index: w.index)
+                            hitsPtr[count] = WallHit(t: t, loss: loss, group: w.group, index: w.index)
                             count += 1
                         }
                     }
                     if total > budget { return total }
                 }
                 if let emit {
-                    for k in 0..<count { emit(hits[k]) }
+                    for k in 0..<count { emit(hitsPtr[k]) }
                 }
                 return total
             }
@@ -188,11 +202,11 @@ public struct PropagationModel: Sendable {
     }
 
     @inline(__always)
-    func direct(from ap: RFAccessPoint, to p: SIMD2<Float>, floor: Int, emit: ((WallHit) -> Void)? = nil) -> DirectPath {
-        let dx = p.x - ap.position.x
-        let dz = p.y - ap.position.y
+    func direct(fromPosition pos: SIMD2<Float>, txPower: Float, apFloor: Int, to p: SIMD2<Float>, floor: Int, emit: ((WallHit) -> Void)? = nil) -> DirectPath {
+        let dx = p.x - pos.x
+        let dz = p.y - pos.y
         let planar2 = dx * dx + dz * dz
-        let floors = abs(floor - ap.floor)
+        let floors = abs(floor - apFloor)
         var distance = planar2.squareRoot()
         var slab: Float = 0
         if floors > 0 {
@@ -212,12 +226,17 @@ public struct PropagationModel: Sendable {
                     callback(scaled)
                 }
             }
-            walls = 0.5 * (wallLoss(ap.position.x, ap.position.y, p.x, p.y, floor: ap.floor, emit: scaledEmit)
-                + wallLoss(ap.position.x, ap.position.y, p.x, p.y, floor: floor, emit: scaledEmit))
+            walls = 0.5 * (wallLoss(pos.x, pos.y, p.x, p.y, floor: apFloor, emit: scaledEmit)
+                + wallLoss(pos.x, pos.y, p.x, p.y, floor: floor, emit: scaledEmit))
         } else {
-            walls = wallLoss(ap.position.x, ap.position.y, p.x, p.y, floor: floor, emit: emit)
+            walls = wallLoss(pos.x, pos.y, p.x, p.y, floor: floor, emit: emit)
         }
-        return DirectPath(rssi: effectiveTx(ap) - freeSpace - walls - slab, distance: distance, freeSpace: freeSpace, walls: walls, slab: slab)
+        return DirectPath(rssi: effectiveTx(txPower: txPower) - freeSpace - walls - slab, distance: distance, freeSpace: freeSpace, walls: walls, slab: slab)
+    }
+
+    @inline(__always)
+    func direct(from ap: RFAccessPoint, to p: SIMD2<Float>, floor: Int, emit: ((WallHit) -> Void)? = nil) -> DirectPath {
+        direct(fromPosition: ap.position, txPower: ap.txPower, apFloor: ap.floor, to: p, floor: floor, emit: emit)
     }
 
     // MARK: Reflections
@@ -230,51 +249,145 @@ public struct PropagationModel: Sendable {
         var legLoss: Float
     }
 
-    /// Power (mW) added by one-bounce specular reflections on the AP's own floor.
+    /// Fast internal wall loss using caller-provided wall and hit buffers (avoids per-leg closure/allocation overhead in reflections).
     @inline(__always)
-    func reflectedPower(from ap: RFAccessPoint, to p: SIMD2<Float>, floor: Int, directRSSI: Float, emit: ((ReflectionHit) -> Void)? = nil) -> Float {
-        guard floor == ap.floor, floor >= 0, floor < reflectorsByFloor.count else { return 0 }
-        let ax = ap.position.x
-        let az = ap.position.y
-        let bx = p.x
-        let bz = p.y
-        let tx = effectiveTx(ap)
-        let cutoff = max(directRSSI - Self.reflectionCutoff, -100)
-        var power: Float = 0
+    func wallLossFast(
+        _ ax: Float, _ az: Float, _ bx: Float, _ bz: Float,
+        walls basePtr: UnsafePointer<PreparedWall>,
+        wallCount: Int,
+        hits hitsPtr: UnsafeMutablePointer<WallHit>,
+        excluding excluded: Int32 = -1,
+        budget: Float = .greatestFiniteMagnitude
+    ) -> Float {
+        let rdx = bx - ax
+        let rdz = bz - az
+        let length2 = rdx * rdx + rdz * rdz
+        guard length2 > 1e-8 else { return 0 }
+        let length = length2.squareRoot()
+        let invLength = 1 / length
+        let tTolerance = Self.endpointTolerance * invLength
+        let pad: Float = 0.02
+        let loX = min(ax, bx) - pad
+        let hiX = max(ax, bx) + pad
+        let loZ = min(az, bz) - pad
+        let hiZ = max(az, bz) + pad
 
-        for w in reflectorsByFloor[floor] {
-            let hS = (ax - w.p1x) * w.nx + (az - w.p1z) * w.nz
-            let hR = (bx - w.p1x) * w.nx + (bz - w.p1z) * w.nz
-            if hS * hR <= 1e-6 { continue }
-            let sx = ax - 2 * hS * w.nx
-            let sz = az - 2 * hS * w.nz
-            let rdx = bx - sx
-            let rdz = bz - sz
+        var count = 0
+        var total: Float = 0
+        var wIdx = 0
+        while wIdx < wallCount {
+            let w = basePtr[wIdx]
+            wIdx += 1
+            if w.index == excluded { continue }
+            if w.maxX < loX || w.minX > hiX || w.maxZ < loZ || w.minZ > hiZ { continue }
             let denom = rdx * w.dz - rdz * w.dx
             if abs(denom) < 1e-9 { continue }
-            let qx = w.p1x - sx
-            let qz = w.p1z - sz
+            let qx = w.p1x - ax
+            let qz = w.p1z - az
             let t = (qx * w.dz - qz * w.dx) / denom
-            if t <= 0.001 || t >= 0.999 { continue }
+            if t <= tTolerance || t >= 1 - tTolerance { continue }
             let u = (qx * rdz - qz * rdx) / denom
-            if u <= 0.001 || u >= 0.999 { continue }
+            let uTolerance = Self.jointExtension / w.length
+            if u < -uTolerance || u > 1 + uTolerance { continue }
 
-            let unfolded = (rdx * rdx + rdz * rdz).squareRoot()
-            let ceiling = tx - freeSpaceLoss(distance: unfolded) - w.reflectionLoss
-            if ceiling < cutoff { continue }
-            let budget = ceiling - cutoff
-            let ix = sx + t * rdx
-            let iz = sz + t * rdz
-            let leg1 = wallLoss(ax, az, ix, iz, floor: floor, excluding: w.index, budget: budget)
-            if leg1 >= budget { continue }
-            let leg2 = wallLoss(ix, iz, bx, bz, floor: floor, excluding: w.index, budget: budget - leg1)
-            let legs = leg1 + leg2
-            if legs >= budget { continue }
-            let rssi = ceiling - legs
-            power += pow(10, rssi / 10)
-            emit?(ReflectionHit(wallIndex: w.index, point: SIMD2<Float>(ix, iz), rssi: rssi, unfoldedDistance: unfolded, legLoss: legs))
+            let cosTheta = abs(rdx * w.nx + rdz * w.nz) * invLength
+            let clampedCos = cosTheta > 1e-4 ? cosTheta : 1e-4
+            let factor = (1 / clampedCos) < 2 ? (1 / clampedCos) : 2
+            let loss = w.loss * factor
+
+            var merged = false
+            var k = 0
+            while k < count {
+                let hk = hitsPtr[k]
+                let sameObstacle = w.group != 0 && hk.group == w.group
+                let jointOrCorner = w.group == 0 && hk.group == 0 && abs(hk.t - t) * length < Self.mergeDistance
+                if sameObstacle || jointOrCorner {
+                    if loss > hk.loss {
+                        total += loss - hk.loss
+                        hitsPtr[k].loss = loss
+                        hitsPtr[k].index = w.index
+                    }
+                    merged = true
+                    break
+                }
+                k += 1
+            }
+            if !merged {
+                total += loss
+                if count < Self.maxHits {
+                    hitsPtr[count] = WallHit(t: t, loss: loss, group: w.group, index: w.index)
+                    count += 1
+                }
+            }
+            if total > budget { return total }
+        }
+        return total
+    }
+
+    /// Power (mW) added by one-bounce specular reflections on the AP's own floor.
+    @inline(__always)
+    func reflectedPower(fromPosition pos: SIMD2<Float>, txPower: Float, apFloor: Int, to p: SIMD2<Float>, floor: Int, directRSSI: Float, emit: ((ReflectionHit) -> Void)? = nil) -> Float {
+        guard floor == apFloor, floor >= 0, floor < reflectorsByFloor.count else { return 0 }
+        let ax = pos.x
+        let az = pos.y
+        let bx = p.x
+        let bz = p.y
+        let tx = effectiveTx(txPower: txPower)
+        let cutoff = directRSSI - Self.reflectionCutoff > -100 ? directRSSI - Self.reflectionCutoff : -100
+        var power: Float = 0
+
+        reflectorsByFloor[floor].withUnsafeBufferPointer { reflectors in
+            guard let reflPtr = reflectors.baseAddress, reflectors.count > 0 else { return }
+            let rCount = reflectors.count
+            blockersByFloor[floor].withUnsafeBufferPointer { blockers in
+                guard let blockPtr = blockers.baseAddress else { return }
+                let bCount = blockers.count
+                withUnsafeTemporaryAllocation(of: WallHit.self, capacity: Self.maxHits) { hits in
+                    guard let hitsPtr = hits.baseAddress else { return }
+                    var rIdx = 0
+                    while rIdx < rCount {
+                        let w = reflPtr[rIdx]
+                        rIdx += 1
+                        let hS = (ax - w.p1x) * w.nx + (az - w.p1z) * w.nz
+                        let hR = (bx - w.p1x) * w.nx + (bz - w.p1z) * w.nz
+                        if hS * hR <= 1e-6 { continue }
+                        let sx = ax - 2 * hS * w.nx
+                        let sz = az - 2 * hS * w.nz
+                        let rdx = bx - sx
+                        let rdz = bz - sz
+                        let denom = rdx * w.dz - rdz * w.dx
+                        if abs(denom) < 1e-9 { continue }
+                        let qx = w.p1x - sx
+                        let qz = w.p1z - sz
+                        let t = (qx * w.dz - qz * w.dx) / denom
+                        if t <= 0.001 || t >= 0.999 { continue }
+                        let u = (qx * rdz - qz * rdx) / denom
+                        if u <= 0.001 || u >= 0.999 { continue }
+
+                        let unfolded = (rdx * rdx + rdz * rdz).squareRoot()
+                        let ceiling = tx - freeSpaceLoss(distance: unfolded) - w.reflectionLoss
+                        if ceiling < cutoff { continue }
+                        let budget = ceiling - cutoff
+                        let ix = sx + t * rdx
+                        let iz = sz + t * rdz
+                        let leg1 = wallLossFast(ax, az, ix, iz, walls: blockPtr, wallCount: bCount, hits: hitsPtr, excluding: w.index, budget: budget)
+                        if leg1 >= budget { continue }
+                        let leg2 = wallLossFast(ix, iz, bx, bz, walls: blockPtr, wallCount: bCount, hits: hitsPtr, excluding: w.index, budget: budget - leg1)
+                        let legs = leg1 + leg2
+                        if legs >= budget { continue }
+                        let rssi = ceiling - legs
+                        power += pow(10, rssi / 10)
+                        emit?(ReflectionHit(wallIndex: w.index, point: SIMD2<Float>(ix, iz), rssi: rssi, unfoldedDistance: unfolded, legLoss: legs))
+                    }
+                }
+            }
         }
         return power
+    }
+
+    @inline(__always)
+    func reflectedPower(from ap: RFAccessPoint, to p: SIMD2<Float>, floor: Int, directRSSI: Float, emit: ((ReflectionHit) -> Void)? = nil) -> Float {
+        reflectedPower(fromPosition: ap.position, txPower: ap.txPower, apFloor: ap.floor, to: p, floor: floor, directRSSI: directRSSI, emit: emit)
     }
 
     // MARK: Public API
@@ -304,8 +417,24 @@ public struct PropagationModel: Sendable {
 
     /// Total loss (free space + walls + slab) between two points, used by the optimizer.
     public func pathLoss(from a: SIMD2<Float>, floorA: Int, to b: SIMD2<Float>, floorB: Int) -> Float {
-        let probe = RFAccessPoint(id: "", name: "", position: a, txPower: 0, floor: floorA)
-        return -direct(from: probe, to: b, floor: floorB).rssi + calibration.offsetDb
+        -direct(fromPosition: a, txPower: 0, apFloor: floorA, to: b, floor: floorB).rssi + calibration.offsetDb
+    }
+
+    /// Effective loss (including deviceMarginDb and optional 1-bounce specular reflections)
+    /// such that `(referenceTx + calibration.offsetDb) - effectiveLoss == rssi(from: probe, to: b, floor: floorB, reflections: reflections)`.
+    public func effectiveLoss(
+        from a: SIMD2<Float>,
+        floorA: Int,
+        to b: SIMD2<Float>,
+        floorB: Int,
+        referenceTx: Float = 20.0,
+        reflections: Bool = true
+    ) -> Float {
+        guard reflections else { return pathLoss(from: a, floorA: floorA, to: b, floorB: floorB) }
+        let d = direct(fromPosition: a, txPower: referenceTx, apFloor: floorA, to: b, floor: floorB)
+        let extra = reflectedPower(fromPosition: a, txPower: referenceTx, apFloor: floorA, to: b, floor: floorB, directRSSI: d.rssi)
+        let fullRSSI = extra > 0 ? 10 * log10(pow(10, d.rssi / 10) + extra) : d.rssi
+        return (referenceTx + calibration.offsetDb) - fullRSSI
     }
 
     /// Full breakdown for the inspector. Uses exactly the same math as `rssi`.
