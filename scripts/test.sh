@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Run the SignalCore test suite (Swift Testing, on macOS) and optionally the verification runner.
+# Run the MeshPlannerCore test suite (Swift Testing, on macOS) and optionally the verification runner.
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
 
 usage() { cat <<USAGE
 Usage: scripts/test.sh [--runner] [--build-app]
 
-  (default)    swift test  (SignalCore unit tests, runs on macOS)
+  (default)    swift test  (MeshPlannerCore unit tests, runs on macOS)
   --runner     Also run the command-line verification/benchmark:
                swift run -c release SignalTestRunner
   --build-app  Also compile the iOS app for the simulator (scripts/build.sh),
-               to catch errors in SignalUI, which swift test does not build.
+               to catch errors in MeshPlannerUI, which swift test does not build.
 
 For end-to-end simulator UI tests (XCUITest), run scripts/ui-test.sh.
 USAGE

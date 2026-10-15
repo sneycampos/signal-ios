@@ -1,6 +1,6 @@
 import SwiftUI
-import SignalCore
-import SignalUI
+import MeshPlannerCore
+import MeshPlannerUI
 import UIKit
 
 @main

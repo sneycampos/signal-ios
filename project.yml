@@ -1,4 +1,4 @@
-name: Signal
+name: MeshPlanner
 options:
   bundleIdPrefix: com.silviogodinho
   deploymentTarget:
@@ -16,12 +16,12 @@ settings:
     CURRENT_PROJECT_VERSION: "3"
 
 targets:
-  SignalCore:
+  MeshPlannerCore:
     type: framework
     platform: iOS
     deploymentTarget: "17.0"
     sources:
-      - path: Sources/SignalCore
+      - path: Sources/MeshPlannerCore
       - path: Resources/PrivacyInfo.xcprivacy
         buildPhase: resources
     settings:
@@ -32,14 +32,14 @@ targets:
         CURRENT_PROJECT_VERSION: "3"
         MARKETING_VERSION: "1.1.0"
 
-  SignalUI:
+  MeshPlannerUI:
     type: framework
     platform: iOS
     deploymentTarget: "17.0"
     sources:
-      - path: Sources/SignalUI
+      - path: Sources/MeshPlannerUI
     dependencies:
-      - target: SignalCore
+      - target: MeshPlannerCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "com.silviogodinho.SignalUI"
@@ -48,7 +48,7 @@ targets:
         CURRENT_PROJECT_VERSION: "3"
         MARKETING_VERSION: "1.1.0"
 
-  Signal:
+  MeshPlanner:
     type: application
     platform: iOS
     deploymentTarget: "17.0"
@@ -56,8 +56,8 @@ targets:
       - path: Sources/SignalApp
       - path: Resources
     dependencies:
-      - target: SignalCore
-      - target: SignalUI
+      - target: MeshPlannerCore
+      - target: MeshPlannerUI
     info:
       path: Resources/Info.plist
       properties:
@@ -94,7 +94,7 @@ targets:
               public.mime-type: [application/x-signalsim]
     settings:
       base:
-        PRODUCT_NAME: "Signal"
+        PRODUCT_NAME: "MeshPlanner"
         PRODUCT_BUNDLE_IDENTIFIER: "com.silviogodinho.signal"
         ASSETCATALOG_COMPILER_APPICON_NAME: "AppIcon"
         TARGETED_DEVICE_FAMILY: "1,2"
@@ -102,30 +102,30 @@ targets:
         CODE_SIGN_IDENTITY: "Apple Development"
         ENABLE_PREVIEWS: NO
 
-  SignalUITests:
+  MeshPlannerUITests:
     type: bundle.ui-testing
     platform: iOS
     deploymentTarget: "17.0"
     sources:
-      - path: Tests/SignalUITests
+      - path: Tests/MeshPlannerUITests
     dependencies:
-      - target: Signal
+      - target: MeshPlanner
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "com.silviogodinho.SignalUITests"
         GENERATE_INFOPLIST_FILE: YES
-        TEST_TARGET_NAME: Signal
+        TEST_TARGET_NAME: MeshPlanner
 
 schemes:
-  Signal:
+  MeshPlanner:
     build:
       targets:
-        Signal: all
-  SignalUITests:
+        MeshPlanner: all
+  MeshPlannerUITests:
     build:
       targets:
-        Signal: [test, run]
-        SignalUITests: [test]
+        MeshPlanner: [test, run]
+        MeshPlannerUITests: [test]
     test:
       targets:
-        - SignalUITests
+        - MeshPlannerUITests
