@@ -14,7 +14,7 @@ public enum ProjectStoreError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .unreadableFile: return "This file is not a valid Signal project."
+        case .unreadableFile: return "This file is not a valid Mesh Planner project."
         }
     }
 }
@@ -186,7 +186,7 @@ public actor ProjectStore {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("export", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let safeName = project.name.components(separatedBy: CharacterSet(charactersIn: "/\\:?%*|\"<>")).joined(separator: "-")
-        let url = folder.appendingPathComponent(safeName.isEmpty ? "Signal" : safeName).appendingPathExtension(Self.fileExtension)
+        let url = folder.appendingPathComponent(safeName.isEmpty ? "Mesh Planner" : safeName).appendingPathExtension(Self.fileExtension)
         try Self.encoder().encode(project).write(to: url, options: .atomic)
         return url
     }

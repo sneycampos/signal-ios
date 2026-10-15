@@ -306,6 +306,8 @@ struct BandPicker: View {
                 } label: {
                     Text(band.displayName)
                         .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                         .foregroundStyle(band == selection ? .black : .white.opacity(0.85))
                         .frame(maxWidth: .infinity, minHeight: 36)
                         .background {

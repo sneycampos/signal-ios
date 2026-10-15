@@ -44,7 +44,7 @@ struct ProjectsHomeView: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("openDemo")
 
-                Text("Everything is calculated on this iPhone. Plans are stored in the Signal folder in the Files app.")
+                Text("Everything is calculated on this iPhone. Plans are stored in the Mesh Planner folder in the Files app.")
                     .font(.footnote)
                     .foregroundStyle(.white.opacity(0.45))
                     .frame(maxWidth: .infinity)
@@ -54,7 +54,7 @@ struct ProjectsHomeView: View {
             .padding(.bottom, 24)
         }
         .background(Theme.canvas.ignoresSafeArea())
-        .navigationTitle("Signal")
+        .navigationTitle("Mesh Planner")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: onImport) {

@@ -642,7 +642,7 @@ public final class FloorplanViewModel {
     // MARK: - Diagnostics
 
     public func diagnosticsText() -> String {
-        var text = "Signal — diagnostics\n\n"
+        var text = "Mesh Planner — diagnostics\n\n"
         if let project, let data = try? ProjectStore.encoder().encode(project), let json = String(data: data, encoding: .utf8) {
             text += "[Project]\n\(json)\n\n"
         }

@@ -27,6 +27,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: "com.silviogodinho.SignalCore"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CURRENT_PROJECT_VERSION: "3"
+        MARKETING_VERSION: "1.1.0"
 
   SignalUI:
     type: framework
@@ -41,6 +43,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: "com.silviogodinho.SignalUI"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CURRENT_PROJECT_VERSION: "3"
+        MARKETING_VERSION: "1.1.0"
 
   Signal:
     type: application
@@ -63,7 +67,7 @@ targets:
         UILaunchScreen: {}
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
-        NSCameraUsageDescription: "Signal uses the camera and LiDAR scanner to scan your rooms and show Wi-Fi signal in augmented reality."
+        NSCameraUsageDescription: "Mesh Planner uses the camera and LiDAR scanner to scan your rooms and show Wi-Fi signal in augmented reality."
         ITSAppUsesNonExemptEncryption: false
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
@@ -76,12 +80,12 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         UIRequiredDeviceCapabilities: [arm64, arkit]
         CFBundleDocumentTypes:
-          - CFBundleTypeName: Signal Project
+          - CFBundleTypeName: Mesh Planner Project
             LSHandlerRank: Owner
             LSItemContentTypes: [com.silviogodinho.signal.project]
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: com.silviogodinho.signal.project
-            UTTypeDescription: Signal Project
+            UTTypeDescription: Mesh Planner Project
             UTTypeConformsTo: [public.json, public.data]
             UTTypeTagSpecification:
               public.filename-extension: [signalsim]
