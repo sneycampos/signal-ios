@@ -8,11 +8,17 @@ public struct WorldAlignment: Codable, Equatable, Sendable {
     public var offset: SIMD2<Float>
     /// World-space height of the scanned floor, used to place the AR overlay.
     public var floorY: Float
+    public var floorElevations: [Float]?
 
     public init(rotation: Float, offset: SIMD2<Float>, floorY: Float) {
         self.rotation = rotation
         self.offset = offset
         self.floorY = floorY
+    }
+
+    public func elevation(for floor: Int, floorHeight: Float) -> Float {
+        if let floorElevations, floorElevations.indices.contains(floor) { return floorElevations[floor] }
+        return floorY + Float(floor) * floorHeight
     }
 
     public func planPoint(worldX: Float, worldZ: Float) -> SIMD2<Float> {
@@ -174,6 +180,8 @@ public struct FloorplanProject: Codable, Identifiable, Equatable, Sendable {
         let walls = try c.decode([RFWallSegment].self, forKey: .walls)
         let width = (try? c.decode(Float.self, forKey: .width)) ?? 10
         let depth = (try? c.decode(Float.self, forKey: .depth)) ?? 10
+        let decodedFloorCount = (try? c.decode(Int.self, forKey: .floorCount)) ?? 1
+        guard (1...32).contains(decodedFloorCount) else { throw ProjectStoreError.unreadableFile }
         self.init(
             id: (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString,
             name: (try? c.decode(String.self, forKey: .name)) ?? "Project",
@@ -193,10 +201,11 @@ public struct FloorplanProject: Codable, Identifiable, Equatable, Sendable {
             probeFloor: (try? c.decode(Int.self, forKey: .probeFloor)) ?? 0,
             selectedBand: (try? c.decode(RFBand.self, forKey: .selectedBand)) ?? .five,
             worldAlignment: try? c.decode(WorldAlignment.self, forKey: .worldAlignment),
-            floorCount: (try? c.decode(Int.self, forKey: .floorCount)) ?? 1
+            floorCount: decodedFloorCount
         )
         schemaVersion = (try? c.decode(Int.self, forKey: .schemaVersion)) ?? 1
         if !calibration.isCalibrated { calibration = .uncalibrated }
+        try validate()
     }
 }
 
@@ -224,7 +233,7 @@ struct LegacyScanState: Decodable {
     let rawObjects: [LegacyObject]?
     let selectedBand: RFBand?
 
-    func toProject() -> FloorplanProject {
+    func toProject() throws -> FloorplanProject {
         var polygons = roomPolygons ?? []
         if polygons.isEmpty, let single = roomPolygon, single.count >= 3 { polygons = [single] }
         let rooms = RoomNaming.assignNames(polygons.map { RoomInfo(name: "", kind: .other, polygon: $0) })
@@ -244,6 +253,7 @@ struct LegacyScanState: Decodable {
             selectedBand: selectedBand ?? .five
         )
         project.schemaVersion = 1
+        try project.validate()
         return ProjectRepair.upgradeIfNeeded(project)
     }
 }

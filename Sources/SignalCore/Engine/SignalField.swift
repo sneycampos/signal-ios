@@ -26,9 +26,20 @@ public struct FieldGrid: Equatable, Sendable {
 
     /// Grid covering the plan with square cells close to `targetCell`, capped at `maxCells`.
     public static func covering(width: Float, depth: Float, targetCell: Float, maxCells: Int) -> FieldGrid {
-        let area = max(width * depth, 0.01)
-        let cell = max(targetCell, (area / Float(max(maxCells, 1))).squareRoot())
-        return FieldGrid(cols: max(1, Int(ceil(width / cell))), rows: max(1, Int(ceil(depth / cell))), cell: cell)
+        guard width.isFinite, depth.isFinite, width > 0, depth > 0, targetCell.isFinite else {
+            return FieldGrid(cols: 1, rows: 1, cell: 1)
+        }
+        let limit = min(max(1, maxCells), 1_000_000)
+        let w = Double(width), d = Double(depth)
+        var cell = max(Double(max(targetCell, 0.001)), sqrt(w * d / Double(limit)), max(w, d) / Double(limit))
+        var cols = max(1, Int(ceil(w / cell)))
+        var rows = max(1, Int(ceil(d / cell)))
+        while cols * rows > limit {
+            cell *= 1.01
+            cols = max(1, Int(ceil(w / cell)))
+            rows = max(1, Int(ceil(d / cell)))
+        }
+        return FieldGrid(cols: cols, rows: rows, cell: Float(cell))
     }
 
     public var count: Int { cols * rows }
@@ -39,6 +50,8 @@ public struct FieldGrid: Equatable, Sendable {
     }
 
     public func cellIndex(for point: SIMD2<Float>) -> Int? {
+        guard point.x.isFinite, point.y.isFinite, point.x >= 0, point.y >= 0,
+              point.x / cell < Float(cols), point.y / cell < Float(rows) else { return nil }
         let col = Int(point.x / cell)
         let row = Int(point.y / cell)
         guard col >= 0, col < cols, row >= 0, row < rows else { return nil }

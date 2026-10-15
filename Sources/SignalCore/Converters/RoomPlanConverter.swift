@@ -130,11 +130,16 @@ public struct ConvertedFloorplan: Sendable {
 // MARK: - Converter
 
 public enum RoomPlanConverter {
+    private static var cancelledPlan: ConvertedFloorplan {
+        ConvertedFloorplan(walls: [], rooms: [], furniture: [], width: 2, depth: 2,
+            alignment: WorldAlignment(rotation: 0, offset: .zero, floorY: 0), routerPosition: nil, routerFloor: 0, floorCount: 1)
+    }
     static let margin: Float = 0.3
     static let axisSnapTolerance: Float = 6 * .pi / 180
     static let weldDistance: Float = 0.12
 
     public static func convert(_ capture: RoomPlanCapture, profile: NetworkProfile = NetworkProfile()) -> ConvertedFloorplan {
+        guard !Task.isCancelled else { return cancelledPlan }
         // Stories → 0-based floors.
         let storyValues = Set(capture.surfaces.map(\.story) + capture.floors.map(\.story) + capture.objects.map(\.story)).sorted()
         let floorOf: (Int) -> Int = { story in storyValues.firstIndex(of: story) ?? 0 }
@@ -161,12 +166,16 @@ public enum RoomPlanConverter {
         floorPolygons = floorPolygons.map { ($0.polygon.map { $0 + offset }, $0.floor) }
         let width = max(2, hi.x - lo.x + 2 * margin)
         let depth = max(2, hi.y - lo.y + 2 * margin)
-        let alignment = WorldAlignment(rotation: rotation, offset: offset, floorY: capture.floorY ?? 0)
+        var alignment = WorldAlignment(rotation: rotation, offset: offset, floorY: capture.floorY ?? 0)
+        alignment.floorElevations = storyValues.enumerated().map { index, story in
+            capture.floors.filter { $0.story == story }.map(\.y).min() ?? (alignment.floorY + Float(index) * profile.floorHeight)
+        }
 
         // 3. Close corners and T-junctions of structural walls.
         var walls = surfaces.filter { $0.category == "wall" }
         let openings = surfaces.filter { $0.category != "wall" }
         walls = weld(walls)
+        guard !Task.isCancelled else { return cancelledPlan }
 
         // 4. Rooms from RoomPlan floors (labelled by sections), or a hull fallback.
         let sections = capture.sections.map { (kind: roomKind(forSection: $0.label), center: rotated($0.center) + offset, floor: floorOf($0.story)) }
@@ -180,6 +189,7 @@ public enum RoomPlanConverter {
             RFWallSegment(id: $0.id, p1: $0.p1, p2: $0.p2, material: .drywall, kind: .wall, floor: floorOf($0.story))
         }
         rooms = ProjectRepair.completeRooms(existing: rooms, walls: barrierSegments, width: width, depth: depth, floorCount: floorCount, sections: sections)
+        guard !Task.isCancelled else { return cancelledPlan }
         if rooms.isEmpty {
             for floor in 0..<floorCount {
                 let points = walls.filter { floorOf($0.story) == floor }.flatMap { [$0.p1, $0.p2] }
@@ -197,6 +207,7 @@ public enum RoomPlanConverter {
         var intervalsByWall: [String: [(a: Float, b: Float, opening: RoomPlanRawSurface)]] = [:]
         var orphanOpenings: [RoomPlanRawSurface] = []
         for opening in openings {
+            guard !Task.isCancelled else { return cancelledPlan }
             guard let parent = parentWall(for: opening, in: walls) else {
                 orphanOpenings.append(opening)
                 continue
@@ -220,6 +231,7 @@ public enum RoomPlanConverter {
         }
 
         for wall in walls {
+            guard !Task.isCancelled else { return cancelledPlan }
             let floor = floorOf(wall.story)
             let exterior = isExterior(wall, rooms: rooms.filter { $0.floor == floor }, allWalls: walls)
             let wallMaterial = exterior ? profile.construction.exteriorMaterial : profile.construction.interiorMaterial
@@ -277,6 +289,7 @@ public enum RoomPlanConverter {
         var furniture: [FurnitureItem] = []
         var group: Int32 = 1000
         for object in capture.objects {
+            guard !Task.isCancelled else { return cancelledPlan }
             let center = rotated(object.position) + offset
             let yaw = object.yaw + rotation
             let floor = floorOf(object.story)
@@ -369,6 +382,7 @@ public enum RoomPlanConverter {
         }
 
         for i in 0..<n {
+            guard !Task.isCancelled else { return [] }
             for j in (i + 1)..<max(i + 1, n) where input[i].story == input[j].story {
                 for first in [true, false] {
                     for second in [true, false] {
@@ -391,6 +405,7 @@ public enum RoomPlanConverter {
 
         // T-junctions: extend an endpoint that stops just short of another wall.
         for i in 0..<n {
+            guard !Task.isCancelled else { return [] }
             for first in [true, false] {
                 let a = endpoint(i, first)
                 for j in 0..<n where j != i && input[i].story == input[j].story {

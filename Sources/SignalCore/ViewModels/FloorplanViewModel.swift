@@ -55,6 +55,8 @@ public struct ProbeReading: Equatable, Sendable {
 }
 
 public struct OptimizerComparison: Equatable, Sendable {
+    public let projectID: String
+    public let floor: Int
     public let proposal: PlacementProposal
     public let band: RFBand
     public let before: CoverageSummary
@@ -137,14 +139,16 @@ public final class FloorplanViewModel {
 
     @ObservationIgnored private var computeTask: Task<Void, Never>?
     @ObservationIgnored private var computeGeneration = 0
-    @ObservationIgnored private var liveInFlight = false
-    @ObservationIgnored private var livePending = false
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var optimizerTask: Task<Void, Never>?
     @ObservationIgnored private var optimizerToken: CancellationToken?
     @ObservationIgnored private var undoStack: [FloorplanProject] = []
     @ObservationIgnored private var dragStart: FloorplanProject?
     @ObservationIgnored private var cachedModel: (key: String, model: PropagationModel)?
+    @ObservationIgnored private var optimizerSnapshot: FloorplanProject?
+    @ObservationIgnored private var dirty = false
+    @ObservationIgnored private var backhaulKey: FloorplanProject?
+    @ObservationIgnored private var backhaulTask: Task<Void, Never>?
 
     public init(store: ProjectStore = ProjectStore()) {
         self.store = store
@@ -161,10 +165,12 @@ public final class FloorplanViewModel {
 
     public func refreshProjects() async {
         projects = await store.list()
+        let ids = Set(projects.prefix(24).map(\.id))
+        previews = previews.filter { ids.contains($0.key) }
         if demoPreview == nil {
             demoPreview = await Task.detached(priority: .utility) { ProjectPreview.make(DefaultApartmentFixture.makeProject()) }.value
         }
-        for summary in projects {
+        for summary in projects.prefix(24) {
             if let existing = previews[summary.id], existing.project.updatedAt >= summary.updatedAt { continue }
             guard let loaded = try? await store.load(id: summary.id) else { continue }
             previews[summary.id] = await Task.detached(priority: .utility) { ProjectPreview.make(loaded) }.value
@@ -179,18 +185,19 @@ public final class FloorplanViewModel {
         do {
             let loaded = try await store.load(id: id)
             hasWorldMap = await store.worldMap(for: id) != nil
-            present(loaded)
+            await present(loaded)
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    public func openDemo() {
+    public func openDemo() async {
         hasWorldMap = false
-        present(DefaultApartmentFixture.makeProject())
+        await present(DefaultApartmentFixture.makeProject())
     }
 
-    private func present(_ newProject: FloorplanProject) {
+    private func present(_ newProject: FloorplanProject) async {
+        guard await flushSave() else { return }
         cancelOptimizer()
         project = newProject
         floor = min(newProject.probeFloor, newProject.floorCount - 1)
@@ -201,19 +208,32 @@ public final class FloorplanViewModel {
         optimizer = .idle
         field = nil
         heatmapImage = nil
+        coverage = .empty
+        roomCoverage = []
+        coverageContours = []
+        weakContours = []
         cachedModel = nil
+        backhaulKey = nil
         refreshInstant()
         recompute(quality: .full)
     }
 
-    public func close() {
-        flushSave()
+    public func close() async {
+        guard await flushSave() else { return }
         cancelOptimizer()
         computeTask?.cancel()
+        backhaulTask?.cancel()
+        computeGeneration += 1
+        isComputing = false
         project = nil
         field = nil
         heatmapImage = nil
         probe = nil
+        coverage = .empty
+        roomCoverage = []
+        coverageContours = []
+        weakContours = []
+        backhaul = [:]
         selection = nil
         Task { await refreshProjects() }
     }
@@ -221,9 +241,21 @@ public final class FloorplanViewModel {
     public func delete(id: String) async {
         if project?.id == id {
             saveTask?.cancel()
+            await saveTask?.value
+        }
+        do { try await store.delete(id: id) }
+        catch {
+            errorMessage = "Couldn't delete the project: \(error.localizedDescription)"
+            return
+        }
+        if project?.id == id {
+            saveTask?.cancel()
+            computeTask?.cancel()
+            computeGeneration += 1
+            cancelOptimizer()
+            dirty = false
             project = nil
         }
-        await store.delete(id: id)
         await refreshProjects()
     }
 
@@ -238,7 +270,11 @@ public final class FloorplanViewModel {
     public func createProject(from capture: RoomPlanCapture, worldMap: Data?) async {
         var profile = NetworkProfile()
         profile.construction = .masonry
-        let converted = RoomPlanConverter.convert(capture, profile: profile)
+        let conversion = Task.detached(priority: .userInitiated) { RoomPlanConverter.convert(capture, profile: profile) }
+        let converted = await withTaskCancellationHandler {
+            await conversion.value
+        } onCancel: { conversion.cancel() }
+        guard !Task.isCancelled else { return }
         guard !converted.walls.isEmpty else {
             errorMessage = "No walls were detected. Point the camera slowly at walls and corners, with good lighting."
             return
@@ -265,10 +301,10 @@ public final class FloorplanViewModel {
         do {
             try await store.save(newProject)
             if let worldMap {
-                try? await store.saveWorldMap(worldMap, for: newProject.id)
+                try await store.saveWorldMap(worldMap, for: newProject.id)
             }
             hasWorldMap = worldMap != nil
-            present(newProject)
+            await present(newProject)
             if converted.routerPosition == nil {
                 tool = .placeRouter
             }
@@ -287,7 +323,7 @@ public final class FloorplanViewModel {
             let imported = try await store.importProject(from: url)
             await refreshProjects()
             hasWorldMap = false
-            present(imported)
+            await present(imported)
             toast = ToastMessage(text: "Project imported.", offersUndo: false)
         } catch {
             errorMessage = error.localizedDescription
@@ -319,6 +355,7 @@ public final class FloorplanViewModel {
     public func setFloor(_ newFloor: Int) {
         guard let project, newFloor >= 0, newFloor < project.floorCount, newFloor != floor else { return }
         floor = newFloor
+        invalidateOptimizer()
         selection = nil
         refreshInstant()
         recompute(quality: .full)
@@ -340,6 +377,7 @@ public final class FloorplanViewModel {
         let apFloor = project.accessPoints[index].floor
         guard let position = validPosition(target, floor: apFloor, previous: project.accessPoints[index].position) else { return }
         self.project?.accessPoints[index].position = position
+        invalidateOptimizer()
         refreshInstant()
         recompute(quality: draggingAccessPointId == nil ? .full : .live)
         if draggingAccessPointId == nil { scheduleSave() }
@@ -408,7 +446,11 @@ public final class FloorplanViewModel {
     }
 
     public func setMaterial(_ material: RFMaterial, forWalls ids: [String]) {
-        let targets = Set(ids)
+        var targets = Set(ids)
+        if let project {
+            let groups = project.walls.filter { targets.contains($0.id) && $0.groupId != 0 }.map { ($0.groupId, $0.floor) }
+            targets.formUnion(project.walls.filter { wall in groups.contains { $0.0 == wall.groupId && $0.1 == wall.floor } }.map(\.id))
+        }
         guard !targets.isEmpty else { return }
         mutate(recompute: .full, invalidatesModel: true) { project in
             for i in project.walls.indices where targets.contains(project.walls[i].id) {
@@ -422,6 +464,7 @@ public final class FloorplanViewModel {
         guard let project else { return }
         var profile = project.profile
         change(&profile)
+        profile.normalizeChannelWidths()
         guard profile != project.profile else { return }
         let constructionChanged = profile.construction != project.profile.construction
         mutate(recompute: .full, invalidatesModel: true) { p in
@@ -497,7 +540,7 @@ public final class FloorplanViewModel {
         let request = PlacementRequest(
             walls: project.walls,
             rooms: project.rooms,
-            accessPoints: project.accessPoints.filter { $0.floor == floor },
+            accessPoints: project.accessPoints,
             profile: project.profile,
             calibration: project.calibration,
             width: project.width,
@@ -507,10 +550,11 @@ public final class FloorplanViewModel {
             lockRouter: lockRouter
         )
         let snapshot = project
+        optimizerSnapshot = snapshot
         let currentFloor = floor
         let reportProgress: @Sendable (Double) -> Void = { [weak self] value in
             Task { @MainActor in
-                guard let self, case .running = self.optimizer else { return }
+                guard let self, !token.isCancelled, case .running = self.optimizer else { return }
                 self.optimizer = .running(progress: value)
             }
         }
@@ -520,7 +564,7 @@ public final class FloorplanViewModel {
                 guard let proposal, !token.isCancelled else { return nil }
                 return FloorplanViewModel.compare(project: snapshot, proposal: proposal, floor: currentFloor)
             }.value
-            guard let self, !token.isCancelled else { return }
+            guard let self, !token.isCancelled, self.project == snapshot, self.floor == currentFloor else { return }
             if let comparison {
                 self.optimizer = .ready(comparison)
             } else {
@@ -538,11 +582,19 @@ public final class FloorplanViewModel {
     }
 
     public func discardOptimizerResult() {
+        cancelOptimizer()
         optimizer = .idle
     }
 
+    private func invalidateOptimizer() {
+        cancelOptimizer()
+        optimizer = .idle
+        optimizerSnapshot = nil
+    }
+
     public func applyOptimizerResult() {
-        guard case .ready(let comparison) = optimizer else { return }
+        guard case .ready(let comparison) = optimizer, project == optimizerSnapshot,
+              project?.id == comparison.projectID, floor == comparison.floor else { invalidateOptimizer(); return }
         let proposal = comparison.proposal
         let currentFloor = floor
         mutate(recompute: .full) { p in
@@ -585,6 +637,8 @@ public final class FloorplanViewModel {
         let before = SignalFieldGenerator.compute(model: model, accessPoints: beforeAPs, floor: floor, mask: mask, scale: scale)
         let after = SignalFieldGenerator.compute(model: model, accessPoints: afterAPs, floor: floor, mask: mask, scale: scale)
         return OptimizerComparison(
+            projectID: project.id,
+            floor: floor,
             proposal: proposal,
             band: band,
             before: before?.coverage ?? .empty,
@@ -609,9 +663,15 @@ public final class FloorplanViewModel {
     }
 
     @discardableResult
-    public func runCalibration() -> Calibrator.Result? {
-        guard let project,
-              let result = Calibrator.fit(measurements: project.measurements, walls: project.walls, accessPoints: project.accessPoints, profile: project.profile) else { return nil }
+    public func runCalibration() async -> Calibrator.Result? {
+        guard let project else { return nil }
+        let token = CancellationToken()
+        let result = await withTaskCancellationHandler {
+            await Task.detached(priority: .userInitiated) {
+                Calibrator.fit(measurements: project.measurements, walls: project.walls, accessPoints: project.accessPoints, profile: project.profile, current: project.calibration, token: token)
+            }.value
+        } onCancel: { token.cancel() }
+        guard !Task.isCancelled, self.project == project, let result else { return nil }
         mutate(recompute: .full, invalidatesModel: true) { $0.calibration = result.calibration }
         return result
     }
@@ -625,6 +685,7 @@ public final class FloorplanViewModel {
     public func undo() {
         guard let previous = undoStack.popLast() else { return }
         project = previous
+        invalidateOptimizer()
         canUndo = !undoStack.isEmpty
         cachedModel = nil
         toast = nil
@@ -662,6 +723,7 @@ public final class FloorplanViewModel {
         guard var copy = project else { return }
         if undoable { pushUndo(copy) }
         change(&copy)
+        invalidateOptimizer()
         project = copy
         if invalidatesModel { cachedModel = nil }
         refreshInstant()
@@ -677,11 +739,27 @@ public final class FloorplanViewModel {
         return model
     }
 
-    /// Cheap, synchronous updates (probe and backhaul) so gestures feel immediate.
+    /// Probe feedback is immediate; backhaul is refreshed only when network inputs change.
     private func refreshInstant() {
         guard let project else { return }
         let model = model(for: project, band: project.selectedBand)
-        backhaul = BackhaulPlanner.plan(accessPoints: project.accessPoints, walls: project.walls, profile: project.profile, calibration: project.calibration)
+        if backhaulKey?.accessPoints != project.accessPoints || backhaulKey?.walls != project.walls || backhaulKey?.profile != project.profile || backhaulKey?.calibration != project.calibration {
+            backhaulKey = project
+            backhaulTask?.cancel()
+            let token = CancellationToken()
+            backhaulTask = Task { [weak self] in
+                let links = await withTaskCancellationHandler {
+                    await Task.detached(priority: .userInitiated) {
+                        BackhaulPlanner.plan(accessPoints: project.accessPoints, walls: project.walls, profile: project.profile, calibration: project.calibration, token: token)
+                    }.value
+                } onCancel: { token.cancel() }
+                guard let self, !Task.isCancelled, self.project?.id == project.id else { return }
+                self.backhaul = links
+                if let current = self.project {
+                    self.probe = Self.reading(project: current, model: self.model(for: current, band: current.selectedBand), backhaul: links, point: current.probe, floor: current.probeFloor)
+                }
+            }
+        }
         probe = FloorplanViewModel.reading(project: project, model: model, backhaul: backhaul, point: project.probe, floor: project.probeFloor)
     }
 
@@ -693,7 +771,8 @@ public final class FloorplanViewModel {
         let budget = ap.map { model.linkBudget(from: $0, to: point, floor: floor) }
         let link = LinkRateModel.estimate(rssi: best.rssi, band: model.band, profile: project.profile)
         let link2 = ap.flatMap { backhaul[$0.id] }
-        let effective = min(link.throughputMbps, link2?.throughputMbps ?? .greatestFiniteMagnitude)
+        let upstream: Float = ap.map { $0.isSatellite ? (link2?.throughputMbps ?? 0) : .greatestFiniteMagnitude } ?? 0
+        let effective = min(link.throughputMbps, upstream)
         let plan = Float(project.profile.internetPlanMbps)
         return ProbeReading(
             point: point,
@@ -720,15 +799,7 @@ public final class FloorplanViewModel {
 
     private func recompute(quality: Quality) {
         guard let project, quality != .none else { return }
-        if quality == .live {
-            if liveInFlight {
-                livePending = true
-                return
-            }
-            liveInFlight = true
-        } else {
-            livePending = false
-        }
+        computeTask?.cancel()
         computeGeneration += 1
         let generation = computeGeneration
         let model = model(for: project, band: project.selectedBand)
@@ -755,7 +826,7 @@ public final class FloorplanViewModel {
                         field: field,
                         image: ImageBox(image: HeatmapImage.make(from: field)),
                         coverageContours: ContourExtractor.segments(in: field, level: scale.coverageThreshold),
-                        weakContours: ContourExtractor.segments(in: field, level: scale.fair),
+                        weakContours: [],
                         rooms: field.roomCoverage(rooms: rooms, accessPoints: aps)
                     )
                 }.value
@@ -763,7 +834,6 @@ public final class FloorplanViewModel {
                 token.cancel()
             }
             guard let self else { return }
-            if isLive { self.liveInFlight = false }
             // Only the latest request may update the map; late results from older requests are dropped.
             if let output, generation == self.computeGeneration {
                 self.field = output.field
@@ -774,16 +844,13 @@ public final class FloorplanViewModel {
                 self.roomCoverage = output.rooms
                 self.isComputing = false
             }
-            if isLive && self.livePending {
-                self.livePending = false
-                self.recompute(quality: .live)
-            }
         }
-        if !isLive { computeTask = task }
+        computeTask = task
     }
 
     private func scheduleSave() {
         guard let project, !project.isDemo else { return }
+        dirty = true
         saveTask?.cancel()
         let snapshot = project
         let store = self.store
@@ -792,18 +859,27 @@ public final class FloorplanViewModel {
             guard !Task.isCancelled else { return }
             do {
                 try await store.save(snapshot)
+                if self.project == snapshot { self.dirty = false }
             } catch {
-                SignalDebugLogger.shared.log("Falha ao salvar: \(error.localizedDescription)", category: "Store")
+                self.errorMessage = "Couldn't save your changes. Free storage and use Retry saving. \(error.localizedDescription)"
             }
         }
     }
 
-    private func flushSave() {
-        guard let project, !project.isDemo else { return }
+    @discardableResult
+    public func flushSave() async -> Bool {
         saveTask?.cancel()
-        let snapshot = project
-        let store = self.store
-        Task { try? await store.save(snapshot) }
+        await saveTask?.value
+        while dirty, let snapshot = project, !snapshot.isDemo {
+            do {
+                try await store.save(snapshot)
+                if project == snapshot { dirty = false }
+            } catch {
+                errorMessage = "Couldn't save your changes. Free storage and try again. \(error.localizedDescription)"
+                return false
+            }
+        }
+        return true
     }
 
     /// Resolves a position for a node: inside the home on its floor, off walls, outside furniture.

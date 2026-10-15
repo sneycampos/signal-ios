@@ -114,11 +114,27 @@ public struct NetworkProfile: Codable, Equatable, Sendable {
     public var supportedBands: [RFBand] { standard.supportedBands }
 
     public func channelWidth(for band: RFBand) -> Int {
+        let requested: Int
         switch band {
-        case .twoPointFour: return channelWidth24
-        case .five: return channelWidth5
-        case .six: return channelWidth6
+        case .twoPointFour: requested = channelWidth24
+        case .five: requested = channelWidth5
+        case .six: requested = channelWidth6
         }
+        return validChannelWidths(for: band).last(where: { $0 <= requested }) ?? 20
+    }
+
+    public func validChannelWidths(for band: RFBand) -> [Int] {
+        switch band {
+        case .twoPointFour: return [20, 40]
+        case .five: return [20, 40, 80, 160]
+        case .six: return standard == .wifi7 ? [20, 40, 80, 160, 320] : [20, 40, 80, 160]
+        }
+    }
+
+    public mutating func normalizeChannelWidths() {
+        channelWidth24 = channelWidth(for: .twoPointFour)
+        channelWidth5 = channelWidth(for: .five)
+        channelWidth6 = channelWidth(for: .six)
     }
 
     /// Band used to decide router/satellite placement: 5 GHz carries most traffic and is the limiting band.
@@ -152,5 +168,6 @@ public struct NetworkProfile: Codable, Equatable, Sendable {
             floorHeight: (try? c.decode(Float.self, forKey: .floorHeight)) ?? d.floorHeight,
             palette: (try? c.decode(HeatmapPalette.self, forKey: .palette)) ?? d.palette
         )
+        normalizeChannelWidths()
     }
 }

@@ -14,7 +14,7 @@ public enum ProjectStoreError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .unreadableFile: return "This file is not a valid Mesh Planner project."
+        case .unreadableFile: return "This project is damaged, uses an unsupported version, or exceeds supported geometry limits. Try another copy or backup."
         }
     }
 }
@@ -91,12 +91,10 @@ public actor ProjectStore {
     public func list() -> [ProjectSummary] {
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(at: projectsDirectory, includingPropertiesForKeys: nil) else { return [] }
-        return files
-            .filter { $0.pathExtension == Self.fileExtension }
-            .compactMap { url -> ProjectSummary? in
-                guard let data = try? Data(contentsOf: url),
-                      let decoded = try? Self.decoder().decode(FloorplanProject.self, from: data) else { return nil }
-                let project = ProjectRepair.upgradeIfNeeded(decoded)
+        let backupIDs = (try? fm.contentsOfDirectory(atPath: backupsDirectory.path)) ?? []
+        let ids = Set(files.filter { $0.pathExtension == Self.fileExtension }.map { $0.deletingPathExtension().lastPathComponent } + backupIDs)
+        return ids.compactMap { id -> ProjectSummary? in
+                guard let project = try? load(id: id) else { return nil }
                 return ProjectSummary(
                     id: project.id,
                     name: project.name,
@@ -110,16 +108,20 @@ public actor ProjectStore {
     }
 
     public func load(id: String) throws -> FloorplanProject {
-        let data = try Data(contentsOf: fileURL(for: id))
-        if let project = try? Self.decoder().decode(FloorplanProject.self, from: data) {
+        guard Self.safeID(id) else { throw ProjectStoreError.unreadableFile }
+        if let project = try? Self.readProject(at: fileURL(for: id)), project.id == id {
             let upgraded = ProjectRepair.upgradeIfNeeded(project)
-            if upgraded.schemaVersion != project.schemaVersion { try? save(upgraded) }
+            try upgraded.validate()
+            if upgraded.schemaVersion != project.schemaVersion { try save(upgraded) }
             return upgraded
         }
         // The main file is damaged: fall back to the newest readable backup.
         for backup in backups(for: id) {
-            if let data = try? Data(contentsOf: backup), let project = try? Self.decoder().decode(FloorplanProject.self, from: data) {
-                return project
+            if let project = try? Self.readProject(at: backup), project.id == id {
+                let upgraded = ProjectRepair.upgradeIfNeeded(project)
+                try upgraded.validate()
+                try save(upgraded)
+                return upgraded
             }
         }
         throw ProjectStoreError.unreadableFile
@@ -128,6 +130,7 @@ public actor ProjectStore {
     // MARK: Saving
 
     public func save(_ project: FloorplanProject) throws {
+        try project.validate()
         guard !project.isDemo else { return }
         var copy = project
         copy.updatedAt = Date()
@@ -162,30 +165,32 @@ public actor ProjectStore {
     // MARK: Deleting
 
     /// Removes the project, its backups and its AR world map.
-    public func delete(id: String) {
+    public func delete(id: String) throws {
+        guard Self.safeID(id) else { throw ProjectStoreError.unreadableFile }
         let fm = FileManager.default
-        try? fm.removeItem(at: fileURL(for: id))
-        try? fm.removeItem(at: worldMapURL(for: id))
-        try? fm.removeItem(at: backupsDirectory.appendingPathComponent(id, isDirectory: true))
+        for url in [fileURL(for: id), worldMapURL(for: id), backupsDirectory.appendingPathComponent(id, isDirectory: true)] where fm.fileExists(atPath: url.path) {
+            try fm.removeItem(at: url)
+        }
     }
 
     // MARK: AR world map
 
     public func saveWorldMap(_ data: Data, for id: String) throws {
+        guard Self.safeID(id) else { throw ProjectStoreError.unreadableFile }
         try data.write(to: worldMapURL(for: id), options: .atomic)
     }
 
     public func worldMap(for id: String) -> Data? {
-        try? Data(contentsOf: worldMapURL(for: id))
+        guard Self.safeID(id) else { return nil }
+        return try? Data(contentsOf: worldMapURL(for: id))
     }
 
     // MARK: Import / export
 
     /// Writes a shareable copy named after the project.
     public func exportFile(for project: FloorplanProject) throws -> URL {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("export", isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let safeName = project.name.components(separatedBy: CharacterSet(charactersIn: "/\\:?%*|\"<>")).joined(separator: "-")
+        let folder = try ExportFilename.directory()
+        let safeName = ExportFilename.sanitized(project.name)
         let url = folder.appendingPathComponent(safeName.isEmpty ? "Mesh Planner" : safeName).appendingPathExtension(Self.fileExtension)
         try Self.encoder().encode(project).write(to: url, options: .atomic)
         return url
@@ -195,7 +200,7 @@ public actor ProjectStore {
     public func importProject(from url: URL) throws -> FloorplanProject {
         let accessing = url.startAccessingSecurityScopedResource()
         defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-        let data = try Data(contentsOf: url)
+        let data = try Self.readData(at: url)
         let fallbackName = url.deletingPathExtension().lastPathComponent
         var project = try Self.decodeAnyFormat(data, fallbackName: fallbackName)
         project = FloorplanProject(
@@ -220,15 +225,24 @@ public actor ProjectStore {
     }
 
     static func decodeAnyFormat(_ data: Data, fallbackName: String) throws -> FloorplanProject {
+        guard data.count <= 20_000_000 else { throw ProjectStoreError.unreadableFile }
         let decoder = Self.decoder()
         if let project = try? decoder.decode(FloorplanProject.self, from: data), !project.walls.isEmpty {
-            return project
+            let upgraded = ProjectRepair.upgradeIfNeeded(project)
+            try upgraded.validate()
+            return upgraded
         }
         if let legacy = try? decoder.decode(LegacyScanState.self, from: data) {
-            return legacy.toProject()
+            let project = try legacy.toProject()
+            try project.validate()
+            return project
         }
         if let document = try? JSONDecoder().decode(SignalFloorplanDocument.self, from: data) {
-            return SignalDataExporter.project(from: document, fallbackName: fallbackName)
+            guard ["1.0", "2.0"].contains(document.version), document.materials.count <= 1_000,
+                  document.walls.count <= 10_000, document.accessPoints.count <= 64 else { throw ProjectStoreError.unreadableFile }
+            let project = SignalDataExporter.project(from: document, fallbackName: fallbackName)
+            try project.validate()
+            return project
         }
         throw ProjectStoreError.unreadableFile
     }
@@ -240,11 +254,25 @@ public actor ProjectStore {
         let fm = FileManager.default
         let legacy = legacyDirectory.appendingPathComponent("current_scan.json")
         guard fm.fileExists(atPath: legacy.path) else { return nil }
-        defer { try? fm.moveItem(at: legacy, to: legacyDirectory.appendingPathComponent("current_scan.migrated.json")) }
         guard let data = try? Data(contentsOf: legacy),
               let state = try? Self.decoder().decode(LegacyScanState.self, from: data) else { return nil }
-        let project = state.toProject()
-        try? save(project)
+        guard let project = try? state.toProject() else { return nil }
+        guard (try? save(project)) != nil else { return nil }
+        try? fm.moveItem(at: legacy, to: legacyDirectory.appendingPathComponent("current_scan.migrated.json"))
         return project
+    }
+
+    private static func safeID(_ id: String) -> Bool {
+        !id.isEmpty && id.count <= 256 && id != "." && id != ".." && !id.contains("/") && !id.contains("\\")
+    }
+
+    private static func readData(at url: URL) throws -> Data {
+        let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        guard size <= 20_000_000 else { throw ProjectStoreError.unreadableFile }
+        return try Data(contentsOf: url)
+    }
+
+    private static func readProject(at url: URL) throws -> FloorplanProject {
+        try decoder().decode(FloorplanProject.self, from: readData(at: url))
     }
 }

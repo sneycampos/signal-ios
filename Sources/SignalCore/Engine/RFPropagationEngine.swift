@@ -56,10 +56,10 @@ public struct PropagationModel: Sendable {
         self.sourceWalls = walls
         self.slabLoss = RFMaterial.floorSlab.crossingLoss(for: band) * calibration.wallLossScale
 
-        let floorCount = max(1, (walls.map(\.floor).max() ?? 0) + 1)
+        let floorCount = max(1, (walls.map(\.floor).filter { (0..<32).contains($0) }.max() ?? 0) + 1)
         var blockers = Array(repeating: [PreparedWall](), count: floorCount)
         var reflectors = Array(repeating: [PreparedWall](), count: floorCount)
-        for (i, w) in walls.enumerated() where w.isActive && w.floor >= 0 {
+        for (i, w) in walls.enumerated() where w.isActive && w.floor >= 0 && w.floor < floorCount {
             let d = w.p2 - w.p1
             let length = simd_length(d)
             guard length > 1e-4 else { continue }
@@ -202,7 +202,14 @@ public struct PropagationModel: Sendable {
             slab = slabLoss * Float(floors) * min(1 / max(cosTheta, 1e-4), 2)
         }
         let freeSpace = freeSpaceLoss(distance: distance)
-        let walls = wallLoss(ap.position.x, ap.position.y, p.x, p.y, floor: floor, emit: emit)
+        // Reciprocal approximation: each endpoint floor contributes half of the projected path.
+        let walls: Float
+        if floors > 0 {
+            walls = 0.5 * (wallLoss(ap.position.x, ap.position.y, p.x, p.y, floor: ap.floor, emit: emit)
+                + wallLoss(ap.position.x, ap.position.y, p.x, p.y, floor: floor, emit: emit))
+        } else {
+            walls = wallLoss(ap.position.x, ap.position.y, p.x, p.y, floor: floor, emit: emit)
+        }
         return DirectPath(rssi: effectiveTx(ap) - freeSpace - walls - slab, distance: distance, freeSpace: freeSpace, walls: walls, slab: slab)
     }
 
