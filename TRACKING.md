@@ -25,7 +25,7 @@
 
 ## Verification
 
-- `swift test`: 50 tests in 6 suites (propagation, converter, field/scale/rate, optimizer/calibration, persistence, real-scan repair).
+- `swift test`: 50 tests in 6 suites (propagation, converter, field/scale/rate, optimizer/calibration, persistence, legacy-scan repair).
 - `swift run -c release SignalTestRunner`: map × inspector consistency and timings (full field ~1 ms, optimizer ~20 ms on the demo, Mac M-series).
 - App build in Swift 6 with no warnings.
 

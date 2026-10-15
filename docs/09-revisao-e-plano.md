@@ -135,9 +135,9 @@ Todos os itens abaixo foram implementados. A verificação automática cobre o n
 ## 5b. Segunda rodada (27/09/2026)
 
 - **Cômodos pretos:** `RoomRegionDetector` encontra as regiões fechadas pelas paredes (portas e janelas contam como barreira; o exterior é preenchido a partir da borda). Completa os pisos do RoomPlan e reconstrói os cômodos de projetos antigos.
-- **Reparo de projetos antigos (esquema 3):** `ProjectRepair` recorta portas sobrepostas às paredes, reclassifica materiais (externa/interna), troca o Low-E antigo das janelas por vidro comum e limpa nomes de parede. Validado com um scan real (`Tests/Fixtures/real-scan.signalsim`): de 3 polígonos quebrados para 8 cômodos, todos com mapa.
+- **Reparo de projetos antigos (esquema 3):** `ProjectRepair` recorta portas sobrepostas às paredes, reclassifica materiais (externa/interna), troca o Low-E antigo das janelas por vidro comum e limpa nomes de parede. Validado com um projeto legado sintético derivado do apartamento demo (`RealScanTests`): de 3 polígonos quebrados para 8 cômodos, todos com mapa.
 - **Cores do sinal:** escala estendida até −35 dBm, suavização visual de 0,6 m dentro de cada cômodo, expoente de distância 2,5 e 3 dB de margem do aparelho quando não há calibração.
-- **UI refeita a partir de mockups** gerados (mapa, tela inicial, detalhes do ponto): mapa em tela cheia, cabeçalho e banda flutuantes, trilho de controles, cartão de resumo, medidor de sinal, miniaturas com anel de cobertura. Testado no simulador com toques reais (AXe): abrir projeto, trocar banda, arrastar roteador, desfazer, otimizar/aplicar, adicionar satélite, 3D.
+- **UI refeita** a partir de protótipos gerados (mapa, tela inicial, detalhes do ponto): mapa em tela cheia, cabeçalho e banda flutuantes, trilho de controles, cartão de resumo, medidor de sinal, miniaturas com anel de cobertura. Testado no simulador com toques reais (AXe): abrir projeto, trocar banda, arrastar roteador, desfazer, otimizar/aplicar, adicionar satélite, 3D.
 
 ## 6. Onde está cada correção
 

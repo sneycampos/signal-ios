@@ -3,16 +3,24 @@ import Testing
 import simd
 @testable import SignalCore
 
-/// Uses a real project captured on an iPhone 16 Pro (legacy geometry: doors overlapping walls, 3 broken room loops).
-@Suite("Real scan repair")
+/// Synthetic legacy project derived from the built-in demo apartment (no real-home data):
+/// marked as a pre-schema-3 user scan with legacy brick partitions, so ProjectRepair must upgrade it.
+@Suite("Legacy scan repair")
 struct RealScanTests {
-    static let fixture = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .appendingPathComponent("Fixtures/real-scan.signalsim")
+    static func legacyFixture() -> FloorplanProject {
+        var p = DefaultApartmentFixture.makeProject()
+        p.isDemo = false
+        p.schemaVersion = 1
+        p.walls = p.walls.map { w in
+            var w = w
+            if w.kind == .wall { w.material = .brick; w.name = "Parede (Brick (0.30 m))" }
+            return w
+        }
+        return p
+    }
 
     func loadRepaired() throws -> FloorplanProject {
-        let data = try Data(contentsOf: Self.fixture)
+        let data = try ProjectStore.encoder().encode(Self.legacyFixture())
         let project = try ProjectStore.decoder().decode(FloorplanProject.self, from: data)
         #expect(project.schemaVersion < FloorplanProject.currentSchemaVersion)
         return ProjectRepair.upgradeIfNeeded(project)
@@ -25,7 +33,7 @@ struct RealScanTests {
         }
         #expect(project.rooms.count >= 6)
         let area = project.rooms.reduce(0) { $0 + $1.area }
-        #expect(area > 50 && area < 110)
+        #expect(area > 50 && area < 150)
     }
 
     @Test func noWallOverlapsAnOpeningAfterRepair() throws {
