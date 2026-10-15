@@ -141,7 +141,13 @@ public final class FloorplanViewModel {
     private var isComputingBackhaul = false
     @ObservationIgnored private var computeTask: Task<Void, Never>?
     @ObservationIgnored private var computeGeneration = 0
+    @ObservationIgnored private var liveInFlight = false
+    @ObservationIgnored private var livePending = false
     @ObservationIgnored private var backhaulGeneration = 0
+    #if DEBUG
+    public private(set) var heatmapPublishCount = 0
+    public private(set) var liveHeatmapPublishCount = 0
+    #endif
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var optimizerTask: Task<Void, Never>?
     @ObservationIgnored private var optimizerToken: CancellationToken?
@@ -251,6 +257,10 @@ public final class FloorplanViewModel {
         optimizer = .idle
         field = nil
         heatmapImage = nil
+        #if DEBUG
+        heatmapPublishCount = 0
+        liveHeatmapPublishCount = 0
+        #endif
         coverage = .empty
         roomCoverage = []
         coverageContours = []
@@ -270,6 +280,12 @@ public final class FloorplanViewModel {
         backhaulTask?.cancel()
         computeGeneration += 1
         backhaulGeneration += 1
+        liveInFlight = false
+        livePending = false
+        #if DEBUG
+        heatmapPublishCount = 0
+        liveHeatmapPublishCount = 0
+        #endif
         isComputingField = false
         isComputingBackhaul = false
         project = nil
@@ -304,6 +320,12 @@ public final class FloorplanViewModel {
             backhaulTask?.cancel()
             computeGeneration += 1
             backhaulGeneration += 1
+            liveInFlight = false
+            livePending = false
+            #if DEBUG
+            heatmapPublishCount = 0
+            liveHeatmapPublishCount = 0
+            #endif
             cancelOptimizer()
             dirty = false
             project = nil
@@ -963,7 +985,18 @@ public final class FloorplanViewModel {
 
     private func recompute(quality: Quality) {
         guard let project, quality != .none else { return }
-        computeTask?.cancel()
+        if quality == .live {
+            if liveInFlight {
+                livePending = true
+                return
+            }
+            computeTask?.cancel()
+            liveInFlight = true
+        } else {
+            computeTask?.cancel()
+            liveInFlight = false
+            livePending = false
+        }
         computeGeneration += 1
         let generation = computeGeneration
         let model = model(for: project, band: project.selectedBand)
@@ -974,7 +1007,6 @@ public final class FloorplanViewModel {
         let width = project.width
         let depth = project.depth
         let isLive = quality == .live
-        if !isLive { computeTask?.cancel() }
         isComputingField = true
 
         let token = CancellationToken()
@@ -997,9 +1029,10 @@ public final class FloorplanViewModel {
             } onCancel: {
                 token.cancel()
             }
-            guard let self else { return }
+            guard let self, generation == self.computeGeneration else { return }
+            if isLive { self.liveInFlight = false }
             // Only the latest request may update the map; late results from older requests are dropped.
-            if let output, generation == self.computeGeneration {
+            if let output {
                 self.field = output.field
                 self.heatmapImage = output.image.image
                 self.coverageContours = output.coverageContours
@@ -1010,7 +1043,15 @@ public final class FloorplanViewModel {
                     guard let room = latestRooms.first(where: { $0.id == cov.id }) else { return cov }
                     return RoomCoverage(id: cov.id, name: room.name, kind: room.kind, labelPoint: cov.labelPoint, summary: cov.summary, grade: cov.grade, servingAccessPointId: cov.servingAccessPointId)
                 }
-                self.isComputingField = false
+                #if DEBUG
+                self.heatmapPublishCount += 1
+                if isLive { self.liveHeatmapPublishCount += 1 }
+                #endif
+            }
+            self.isComputingField = false
+            if isLive && self.livePending {
+                self.livePending = false
+                self.recompute(quality: .live)
             }
         }
         computeTask = task

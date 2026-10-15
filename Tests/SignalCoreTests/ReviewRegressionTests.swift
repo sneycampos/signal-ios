@@ -626,4 +626,99 @@ extension ReviewRegressionTests {
         let reloaded = try await store.load(id: p.id)
         #expect(abs(reloaded.updatedAt.timeIntervalSince(past)) < 1)
     }
+
+    @Test @MainActor func liveDragPublishesIntermediateUpdatesAndEndsWithFullDropResult() async throws {
+        let (store, root) = try store()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var p = project()
+        p.width = 10
+        p.depth = 10
+        p.rooms = [RoomInfo(name: "Hall", kind: .livingRoom, polygon: [[0, 0], [10, 0], [10, 10], [0, 10]])]
+        p.walls = []
+        p.accessPoints = [RFAccessPoint(name: "Router", position: [1, 1])]
+        try await store.save(p)
+
+        let model = FloorplanViewModel(store: store)
+        await model.open(id: p.id)
+        let apID = p.accessPoints[0].id
+        let samplePoint = SIMD2<Float>(9, 9)
+
+        try await waitUntil { !model.isComputing && model.field != nil }
+        let initialField = try #require(model.field)
+        let initialRSSI = try #require(initialField.value(at: samplePoint))
+        #expect(initialField.grid.cell <= 0.11)
+        #expect(model.heatmapPublishCount == 1)
+        #expect(model.liveHeatmapPublishCount == 0)
+
+        model.beginDrag(accessPointId: apID)
+        for step in 1...40 {
+            let coord = 1.0 + Float(step) * 0.1
+            model.moveAccessPoint(id: apID, to: [coord, coord])
+        }
+        let midDragPosition = try #require(model.accessPoint(id: apID)?.position)
+
+        // Before endDrag(), the first in-flight .live compute (at the first drag step) must NOT be cancelled
+        // by the 39 subsequent drag moves, so it publishes an intermediate live field before the coalesced
+        // follow-up compute finishes.
+        try await waitUntil {
+            guard let field = model.field, field.grid.cell >= 0.2 else { return false }
+            guard let rssi = field.value(at: samplePoint) else { return false }
+            return rssi > initialRSSI
+        }
+        let firstLiveField = try #require(model.field)
+        let firstLiveRSSI = try #require(firstLiveField.value(at: samplePoint))
+        #expect(firstLiveField.grid.cell >= 0.2)
+        #expect(firstLiveRSSI > initialRSSI)
+        #expect(model.liveHeatmapPublishCount >= 1)
+
+        // Then the coalesced follow-up live compute settles onto the latest mid-drag position.
+        try await waitUntil {
+            guard let field = model.field, field.grid.cell >= 0.2 else { return false }
+            guard let rssi = field.value(at: samplePoint) else { return false }
+            return rssi > initialRSSI + 1 && !model.isComputing
+        }
+        let liveField = try #require(model.field)
+        let liveRSSI = try #require(liveField.value(at: samplePoint))
+        let propModel = PropagationModel(walls: p.walls, band: p.selectedBand)
+        let liveCellIdx = try #require(liveField.grid.cellIndex(for: samplePoint))
+        let liveCol = liveCellIdx % liveField.grid.cols
+        let liveRow = liveCellIdx / liveField.grid.cols
+        let expectedMidRSSI = propModel.rssi(from: RFAccessPoint(name: "Router", position: midDragPosition), to: liveField.grid.center(col: liveCol, row: liveRow), floor: 0)
+        #expect(liveField.grid.cell >= 0.2)
+        #expect(liveRSSI >= firstLiveRSSI)
+        #expect(abs(liveRSSI - expectedMidRSSI) < 0.05)
+        #expect(model.heatmapImage?.width == liveField.grid.cols)
+        #expect(model.liveHeatmapPublishCount == 2)
+
+        // Issue another burst of moves followed immediately by a final drop move and endDrag()
+        // so that in-flight/pending live work is cancelled by the .full recompute on drop.
+        for step in 41...60 {
+            let coord = 1.0 + Float(step) * 0.1
+            model.moveAccessPoint(id: apID, to: [coord, coord])
+        }
+        model.moveAccessPoint(id: apID, to: [8.5, 8.5])
+        let dropPosition = try #require(model.accessPoint(id: apID)?.position)
+        model.endDrag()
+
+        try await waitUntil { !model.isComputing && model.field?.grid.cell ?? 1 <= 0.11 }
+        let finalField = try #require(model.field)
+        let finalRSSI = try #require(finalField.value(at: samplePoint))
+        let freshGrid = FieldGrid.covering(width: p.width, depth: p.depth, targetCell: 0.1, maxCells: 30_000)
+        let freshMask = InteriorMask(grid: freshGrid, polygons: p.rooms(onFloor: 0).map(\.polygon))
+        let freshDropField = try #require(SignalFieldGenerator.compute(
+            model: propModel,
+            accessPoints: [RFAccessPoint(id: apID, name: "Router", position: dropPosition)],
+            floor: 0,
+            mask: freshMask,
+            scale: SignalScale(profile: p.profile)
+        ))
+        #expect(finalField.grid == freshDropField.grid)
+        #expect(finalField.rssi == freshDropField.rssi)
+        #expect(finalField.coverage == freshDropField.coverage)
+        #expect(finalField.grid.cell <= 0.11)
+        #expect(finalRSSI > liveRSSI + 1)
+        #expect(model.heatmapImage?.width == finalField.grid.cols)
+
+        await model.close()
+    }
 }
