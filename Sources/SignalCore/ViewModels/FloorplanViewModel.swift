@@ -127,7 +127,7 @@ public final class FloorplanViewModel {
     public private(set) var roomCoverage: [RoomCoverage] = []
     public private(set) var backhaul: [String: BackhaulLink] = [:]
     public private(set) var probe: ProbeReading?
-    public private(set) var isComputing = false
+    public var isComputing: Bool { isComputingField || isComputingBackhaul }
     public var optimizer: OptimizerState = .idle
     public private(set) var canUndo = false
     public var toast: ToastMessage?
@@ -137,8 +137,11 @@ public final class FloorplanViewModel {
 
     // MARK: Private
 
+    private var isComputingField = false
+    private var isComputingBackhaul = false
     @ObservationIgnored private var computeTask: Task<Void, Never>?
     @ObservationIgnored private var computeGeneration = 0
+    @ObservationIgnored private var backhaulGeneration = 0
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var optimizerTask: Task<Void, Never>?
     @ObservationIgnored private var optimizerToken: CancellationToken?
@@ -236,7 +239,9 @@ public final class FloorplanViewModel {
         computeTask?.cancel()
         backhaulTask?.cancel()
         computeGeneration += 1
-        isComputing = false
+        backhaulGeneration += 1
+        isComputingField = false
+        isComputingBackhaul = false
         project = nil
         hasWorldMap = false
         draggingAccessPointId = nil
@@ -268,6 +273,7 @@ public final class FloorplanViewModel {
             computeTask?.cancel()
             backhaulTask?.cancel()
             computeGeneration += 1
+            backhaulGeneration += 1
             cancelOptimizer()
             dirty = false
             project = nil
@@ -280,7 +286,8 @@ public final class FloorplanViewModel {
             roomCoverage = []
             coverageContours = []
             weakContours = []
-            isComputing = false
+            isComputingField = false
+            isComputingBackhaul = false
         }
         await refreshProjects()
     }
@@ -868,7 +875,10 @@ public final class FloorplanViewModel {
         if Self.needsBackhaulRefresh(from: backhaulKey, to: project) {
             backhaulKey = project
             backhaulTask?.cancel()
+            backhaulGeneration += 1
+            let generation = backhaulGeneration
             backhaul = [:]
+            isComputingBackhaul = true
             let token = CancellationToken()
             backhaulTask = Task { [weak self] in
                 let links = await withTaskCancellationHandler {
@@ -876,8 +886,9 @@ public final class FloorplanViewModel {
                         BackhaulPlanner.plan(accessPoints: project.accessPoints, walls: project.walls, profile: project.profile, calibration: project.calibration, token: token)
                     }.value
                 } onCancel: { token.cancel() }
-                guard let self, !Task.isCancelled, self.project?.id == project.id else { return }
+                guard let self, generation == self.backhaulGeneration, !Task.isCancelled, self.project?.id == project.id else { return }
                 self.backhaul = links
+                self.isComputingBackhaul = false
                 if let current = self.project {
                     self.probe = Self.reading(project: current, model: self.model(for: current, band: current.selectedBand), backhaul: links, point: current.probe, floor: current.probeFloor)
                 }
@@ -934,7 +945,7 @@ public final class FloorplanViewModel {
         let depth = project.depth
         let isLive = quality == .live
         if !isLive { computeTask?.cancel() }
-        isComputing = true
+        isComputingField = true
 
         let token = CancellationToken()
         let task = Task { [weak self] in
@@ -964,8 +975,12 @@ public final class FloorplanViewModel {
                 self.coverageContours = output.coverageContours
                 self.weakContours = output.weakContours
                 self.coverage = output.field.coverage
-                self.roomCoverage = output.rooms
-                self.isComputing = false
+                let latestRooms = self.project?.rooms ?? []
+                self.roomCoverage = output.rooms.map { cov in
+                    guard let room = latestRooms.first(where: { $0.id == cov.id }) else { return cov }
+                    return RoomCoverage(id: cov.id, name: room.name, kind: room.kind, labelPoint: cov.labelPoint, summary: cov.summary, grade: cov.grade, servingAccessPointId: cov.servingAccessPointId)
+                }
+                self.isComputingField = false
             }
         }
         computeTask = task
@@ -1015,22 +1030,9 @@ public final class FloorplanViewModel {
         }
         let floorWalls = project.walls.filter { $0.floor == floor }
         let obstacles = Geometry.obstacleFootprints(floorWalls, floor: floor)
-        if let obstacle = obstacles.first(where: { Geometry.contains($0, p) }) {
-            if let previous { return previous }
-            if let fallbackRoom = rooms.first(where: { r in !obstacles.contains { Geometry.contains($0, r.labelPoint) } }) {
-                p = fallbackRoom.labelPoint
-            } else if obstacle.count >= 3 {
-                let center = obstacle.reduce(.zero, +) / Float(obstacle.count)
-                var bestEdge = obstacle[0]
-                var bestDistance = Float.greatestFiniteMagnitude
-                for i in 0..<obstacle.count {
-                    let edge = Geometry.closestPoint(on: obstacle[i], obstacle[(i + 1) % obstacle.count], to: p)
-                    let d = simd_distance(edge, p)
-                    if d < bestDistance { bestDistance = d; bestEdge = edge }
-                }
-                let dir = simd_length(bestEdge - center) > 1e-4 ? simd_normalize(bestEdge - center) : SIMD2<Float>(1, 0)
-                p = bestEdge + dir * 0.2
-            }
+        if obstacles.contains(where: { Geometry.contains($0, p) }) {
+            guard previous == nil, let fallbackRoom = rooms.first(where: { r in !obstacles.contains { Geometry.contains($0, r.labelPoint) } }) else { return previous }
+            p = fallbackRoom.labelPoint
         }
         return RoomPlanConverter.pushAwayFromWalls(p, walls: floorWalls)
     }

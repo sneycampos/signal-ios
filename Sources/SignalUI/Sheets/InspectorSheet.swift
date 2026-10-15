@@ -306,6 +306,9 @@ private struct AccessPointEditor: View {
             commitName(for: oldId)
             name = ap.name
         }
+        .onChange(of: ap.name) { _, newValue in
+            name = newValue
+        }
         .onDisappear { commitName(for: ap.id) }
 
         if ap.isSatellite {
@@ -374,6 +377,9 @@ private struct RoomDetail: View {
         .onChange(of: room.id) { oldId, _ in
             commitName(for: oldId)
             name = room.name
+        }
+        .onChange(of: room.name) { _, newValue in
+            name = newValue
         }
         .onDisappear { commitName(for: room.id) }
         if let coverage {

@@ -8,11 +8,7 @@ enum ReportRenderer {
     @MainActor
     static func render(model: FloorplanViewModel, project: FloorplanProject) -> URL? {
         guard !model.isComputing, model.field != nil, model.project == project else { return nil }
-        let backhaul = (!model.backhaul.isEmpty || !project.satellites.contains(where: \.isActive))
-            ? model.backhaul
-            : BackhaulPlanner.plan(accessPoints: project.accessPoints, walls: project.walls, profile: project.profile, calibration: project.calibration)
         var snapshot = PlanSnapshot(model: model, project: project, drawNodes: true, drawGrid: false)
-        snapshot.backhaul = backhaul
         snapshot.printPalette = true
         snapshot.probe = nil
         snapshot.showRays = false

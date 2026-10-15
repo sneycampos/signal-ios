@@ -317,7 +317,7 @@ extension ReviewRegressionTests {
         let proposal = try #require(PlacementOptimizer.optimize(PlacementRequest(walls: [], rooms: [room],
             accessPoints: [router, fixed,
                 RFAccessPoint(name: "Replaced wireless", position: [2, 2], txPower: 30, isSatellite: true, floor: 1),
-                RFAccessPoint(name: "Removed wired", position: [50, 2], txPower: 100, isSatellite: true, floor: 1, backhaul: .wired)],
+                RFAccessPoint(name: "Removed wireless", position: [50, 2], txPower: 100, isSatellite: true, floor: 1)],
             profile: NetworkProfile(), width: 204, depth: 4,
             floor: 1, satellites: .exactly(1))))
         #expect(proposal.satellitePositions.isEmpty)
@@ -486,7 +486,7 @@ extension ReviewRegressionTests {
         let wireless = RFAccessPoint(name: "Wireless", position: [102, 2], isSatellite: true, floor: 1, backhaul: .wireless)
         let wired = RFAccessPoint(name: "Wired", position: [101, 2], isSatellite: true, floor: 1, backhaul: .wired)
         let room = RoomInfo(name: "Remote upstairs", kind: .bedroom, polygon: [[100, 0], [108, 0], [108, 4], [100, 4]], floor: 1)
-        let proposal = try #require(PlacementOptimizer.optimize(PlacementRequest(
+        let proposal2 = try #require(PlacementOptimizer.optimize(PlacementRequest(
             walls: [],
             rooms: [room],
             accessPoints: [router, wireless, wired],
@@ -497,7 +497,20 @@ extension ReviewRegressionTests {
             satellites: .exactly(2),
             lockRouter: true
         )))
-        #expect(proposal.satellitePositions.count == 2)
+        #expect(proposal2.satellitePositions.count == 2)
+
+        let proposal1 = try #require(PlacementOptimizer.optimize(PlacementRequest(
+            walls: [],
+            rooms: [room],
+            accessPoints: [router, wireless, wired],
+            profile: NetworkProfile(),
+            width: 108,
+            depth: 4,
+            floor: 1,
+            satellites: .exactly(1),
+            lockRouter: true
+        )))
+        #expect(proposal1.satellitePositions.count == 1)
     }
 
     @Test @MainActor func metadataEditsKeepBackhaulAndAvoidUndoSpam() async throws {
@@ -532,6 +545,12 @@ extension ReviewRegressionTests {
         #expect(!model.isComputing)
         #expect(model.backhaul[sat.id] != nil)
         #expect(model.probe?.internetMbps != nil)
+
+        model.setBand(.twoPointFour)
+        model.updateRoom(id: p.rooms[0].id, name: "Study", kind: .office)
+        try await waitUntil { !model.isComputing }
+        #expect(model.roomCoverage.first?.name == "Study")
+        #expect(model.roomCoverage.first?.kind == .office)
         await model.close()
     }
 
@@ -587,6 +606,13 @@ extension ReviewRegressionTests {
         p.schemaVersion = 1
         let primary = await store.fileURL(for: p.id)
         try ProjectStore.encoder().encode(p).write(to: primary)
+        let projectsPath = await store.projectsDirectory.path
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: projectsPath)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: projectsPath) }
+        let readOnlyLoaded = try await store.load(id: p.id)
+        #expect(readOnlyLoaded.schemaVersion == FloorplanProject.currentSchemaVersion)
+        #expect(abs(readOnlyLoaded.updatedAt.timeIntervalSince(past)) < 1)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: projectsPath)
         let upgraded = try await store.load(id: p.id)
         #expect(abs(upgraded.updatedAt.timeIntervalSince(past)) < 1)
         let reloaded = try await store.load(id: p.id)

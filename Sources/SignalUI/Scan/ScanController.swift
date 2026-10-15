@@ -150,9 +150,13 @@ final class ScanController {
         guard !cancelled else { return }
         processingTask?.cancel()
         processingTask = nil
+        roomWarning = nil
+        canCompleteFromWarning = false
         phase = .failed(roomsCaptured > 0
             ? "Scanning was interrupted. You can save the rooms already captured or close and try again."
             : "Scanning was interrupted. Close this scan and try again.")
+        captureView.captureSession.delegate = nil
+        captureView.delegate = nil
         captureView.captureSession.stop(pauseARSession: true)
         arSession.pause()
     }
@@ -160,20 +164,25 @@ final class ScanController {
     // MARK: Delegate events
 
     fileprivate func didUpdate(_ room: CapturedRoom) {
-        guard !cancelled, phase == .scanning else { return }
+        guard !cancelled, captureView.captureSession.delegate != nil, phase == .scanning else { return }
         currentStory = room.story
         counts = Counts(walls: room.walls.count, doors: room.doors.count + room.openings.count, windows: room.windows.count, objects: room.objects.count)
     }
 
     fileprivate func didEnd(with data: CapturedRoomData, error: String?) {
-        guard !cancelled else { return }
+        guard !cancelled, captureView.captureSession.delegate != nil else { return }
+        if case .failed = phase { return }
         if let error {
-            phase = .failed("Scanning stopped: \(error). Close this scan and try again.")
+            phase = .failed(roomsCaptured > 0
+                ? "Scanning stopped: \(error). You can save the rooms already captured or close and try again."
+                : "Scanning stopped: \(error). Close this scan and try again.")
             arSession.pause()
             return
         }
         guard phase == .processingRoom || phase == .finishing else {
-            phase = .failed("Scanning was interrupted. Close this scan and try again.")
+            phase = .failed(roomsCaptured > 0
+                ? "Scanning was interrupted. You can save the rooms already captured or close and try again."
+                : "Scanning was interrupted. Close this scan and try again.")
             arSession.pause()
             return
         }

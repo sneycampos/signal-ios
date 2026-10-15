@@ -149,7 +149,8 @@ public enum PlacementOptimizer {
         }
 
         let routerTx = router.txPower + request.calibration.offsetDb
-        let existingSatellites = Array(request.accessPoints.filter { $0.isSatellite && $0.floor == floor }.prefix(maxCount))
+        let existingSatellites = request.accessPoints
+            .filter { $0.isSatellite && $0.floor == floor }
             .sorted { ($0.backhaul == .wired ? 0 : 1) < ($1.backhaul == .wired ? 0 : 1) }
         let fixedAPs = request.accessPoints.filter { $0.isSatellite && $0.floor != floor && $0.isActive }
         let fixedRows = fixedAPs.map { ap in points.map { model.rssi(from: ap, to: $0, floor: floor) } }

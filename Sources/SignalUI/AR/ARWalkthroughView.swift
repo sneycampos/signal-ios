@@ -152,20 +152,20 @@ final class ARWalkSession {
             status = .failed("Camera access is turned off. Allow camera access in Settings to use augmented reality.")
             return
         }
+        guard let worldMap, let map = try? NSKeyedUnarchiver.unarchivedObject(ofClass: ARWorldMap.self, from: worldMap) else {
+            status = .failed("No environment map for this project. Scan again to use AR.")
+            return
+        }
         self.project = project
         self.alignment = alignment
         self.floor = floor
         self.heatmap = heatmap
-        let prepared = await Task.detached(priority: .userInitiated) {
-            let prop = PropagationModel(walls: project.walls, band: project.selectedBand, calibration: project.calibration, floorHeight: project.profile.floorHeight)
-            let links = (!backhaul.isEmpty || !project.satellites.contains(where: \.isActive))
-                ? backhaul
-                : BackhaulPlanner.plan(accessPoints: project.accessPoints, walls: project.walls, profile: project.profile, calibration: project.calibration)
-            return (prop, links)
+        self.backhaul = backhaul
+        let prop = await Task.detached(priority: .userInitiated) {
+            PropagationModel(walls: project.walls, band: project.selectedBand, calibration: project.calibration, floorHeight: project.profile.floorHeight)
         }.value
         guard !Task.isCancelled, !stopped else { return }
-        propagation = prepared.0
-        self.backhaul = prepared.1
+        propagation = prop
 
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = [.horizontal]
@@ -173,13 +173,8 @@ final class ARWalkSession {
             configuration.sceneReconstruction = .mesh
             arView.environment.sceneUnderstanding.options.insert(.occlusion)
         }
-        if let worldMap, let map = try? NSKeyedUnarchiver.unarchivedObject(ofClass: ARWorldMap.self, from: worldMap) {
-            configuration.initialWorldMap = map
-            status = .relocalizing
-        } else {
-            status = .failed("No environment map for this project. Scan again to use AR.")
-            return
-        }
+        configuration.initialWorldMap = map
+        status = .relocalizing
         let delegate = ARWalkDelegate(session: self)
         self.delegate = delegate
         arView.session.delegate = delegate
