@@ -110,13 +110,13 @@ public actor ProjectStore {
     public func load(id: String) throws -> FloorplanProject {
         guard Self.safeID(id) else { throw ProjectStoreError.unreadableFile }
         if let (project, upgraded) = try? Self.readAndUpgrade(at: fileURL(for: id), id: id) {
-            if upgraded.schemaVersion != project.schemaVersion { try save(upgraded) }
+            if upgraded.schemaVersion != project.schemaVersion { try? save(upgraded, preserveTimestamp: true) }
             return upgraded
         }
         // The main file is damaged: fall back to the newest readable backup.
         for backup in backups(for: id) {
             if let (_, upgraded) = try? Self.readAndUpgrade(at: backup, id: id) {
-                try save(upgraded)
+                try? save(upgraded, preserveTimestamp: true)
                 return upgraded
             }
         }
@@ -125,11 +125,11 @@ public actor ProjectStore {
 
     // MARK: Saving
 
-    public func save(_ project: FloorplanProject) throws {
+    public func save(_ project: FloorplanProject, preserveTimestamp: Bool = false) throws {
         try project.validate()
         guard !project.isDemo else { return }
         var copy = project
-        copy.updatedAt = Date()
+        if !preserveTimestamp { copy.updatedAt = Date() }
         let data = try Self.encoder().encode(copy)
         try data.write(to: fileURL(for: project.id), options: .atomic)
         rotateBackup(data: data, id: project.id)
@@ -192,8 +192,20 @@ public actor ProjectStore {
         return url
     }
 
-    /// Imports a `.signalsim` project, a legacy scan or a web floorplan document. Always creates a new project.
+    public func isExistingProjectFile(_ url: URL) -> String? {
+        let dir = url.standardizedFileURL.resolvingSymlinksInPath().deletingLastPathComponent()
+        let projectsDir = projectsDirectory.standardizedFileURL.resolvingSymlinksInPath()
+        guard dir == projectsDir, url.pathExtension.lowercased() == Self.fileExtension else { return nil }
+        let id = url.deletingPathExtension().lastPathComponent
+        guard Self.safeID(id), FileManager.default.fileExists(atPath: fileURL(for: id).path) else { return nil }
+        return id
+    }
+
+    /// Imports a `.signalsim` project, a legacy scan or a web floorplan document. Opens in place when already in `Projects`.
     public func importProject(from url: URL) throws -> FloorplanProject {
+        if let existingID = isExistingProjectFile(url) {
+            return try load(id: existingID)
+        }
         let accessing = url.startAccessingSecurityScopedResource()
         defer { if accessing { url.stopAccessingSecurityScopedResource() } }
         let data = try Self.readData(at: url)

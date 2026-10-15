@@ -30,7 +30,7 @@ public struct PlacementRequest: Sendable {
         depth: Float,
         floor: Int = 0,
         satellites: SatelliteCountOption = .automatic,
-        lockRouter: Bool = false,
+        lockRouter: Bool? = nil,
         maxSatellites: Int = 3
     ) {
         self.walls = walls
@@ -42,7 +42,7 @@ public struct PlacementRequest: Sendable {
         self.depth = depth
         self.floor = floor
         self.satellites = satellites
-        self.lockRouter = lockRouter
+        self.lockRouter = lockRouter ?? accessPoints.first(where: { !$0.isSatellite && $0.isActive })?.isLocked ?? false
         self.maxSatellites = maxSatellites
     }
 }
@@ -142,11 +142,18 @@ public enum PlacementOptimizer {
         if token?.isCancelled == true { return nil }
         progress?(0.35)
 
+        let maxCount: Int
+        switch request.satellites {
+        case .automatic: maxCount = max(0, min(request.maxSatellites, 6))
+        case .exactly(let n): maxCount = max(0, min(n, 6))
+        }
+
         let routerTx = router.txPower + request.calibration.offsetDb
-        let existingSatellites = request.accessPoints.filter { $0.isSatellite && $0.floor == floor }
+        let existingSatellites = Array(request.accessPoints.filter { $0.isSatellite && $0.floor == floor }.prefix(maxCount))
+            .sorted { ($0.backhaul == .wired ? 0 : 1) < ($1.backhaul == .wired ? 0 : 1) }
         let fixedAPs = request.accessPoints.filter { $0.isSatellite && $0.floor != floor && $0.isActive }
         let fixedRows = fixedAPs.map { ap in points.map { model.rssi(from: ap, to: $0, floor: floor) } }
-        func satelliteTx(_ i: Int) -> Float { (i < existingSatellites.count ? existingSatellites[i].txPower : router.txPower) + request.calibration.offsetDb }
+        func satelliteTx(_ i: Int) -> Float { (i < existingSatellites.count ? existingSatellites[i].txPower : 20.0) + request.calibration.offsetDb }
         func satelliteIsWired(_ i: Int) -> Bool { i < existingSatellites.count && existingSatellites[i].backhaul == .wired }
 
         func row(candidate c: Int, tx: Float) -> [Float] {
@@ -171,8 +178,7 @@ public enum PlacementOptimizer {
         func backhaulRSSI(from a: SIMD2<Float>, txA: Float, to b: SIMD2<Float>, sourceFloor: Int) -> Float {
             txA - backhaulModel.pathLoss(from: a, floorA: sourceFloor, to: b, floorB: floor)
         }
-        /// Every wireless satellite must reach the router through a chain of links ≥ −70 dBm.
-        func isConnected(router r: SIMD2<Float>, satellites: [SIMD2<Float>]) -> Bool {
+        func evaluateConnectivity(router r: SIMD2<Float>, satellites: [SIMD2<Float>]) -> (remaining: [Int], unreachedFixed: [RFAccessPoint]) {
             var reached = [SIMD2<Float>](arrayLiteral: r)
             var reachedTx = [routerTx]
             var reachedFloors = [router.floor]
@@ -214,34 +220,42 @@ public enum PlacementOptimizer {
                     }
                 }
             }
-            return remaining.isEmpty
+            return (remaining, fixedPending)
+        }
+        let initialUnreachedFixed = Set(evaluateConnectivity(router: router.position, satellites: []).unreachedFixed.map(\.id))
+        let requiredFixedIDs = Set(fixedAPs.filter { $0.backhaul != .wired && !initialUnreachedFixed.contains($0.id) }.map(\.id))
+        /// Every wireless satellite must reach the router through a chain of links ≥ −70 dBm.
+        func isConnected(router r: SIMD2<Float>, satellites: [SIMD2<Float>]) -> Bool {
+            let result = evaluateConnectivity(router: r, satellites: satellites)
+            return result.remaining.isEmpty && !result.unreachedFixed.contains { requiredFixedIDs.contains($0.id) }
         }
 
         // 3. Router position.
+        let routerMovable = !request.lockRouter && router.floor == floor
         var routerPosition = router.position
         var routerRow: [Float]
-        if request.lockRouter || router.isLocked || router.floor != floor {
+        if !routerMovable {
             routerRow = directRow(at: routerPosition, tx: routerTx, sourceFloor: router.floor)
         } else {
-            var bestC = 0
+            var bestC = -1
             var bestScore: Float = -1
             for c in 0..<candidateCount {
+                let position = points[candidateIndices[c]]
+                if !requiredFixedIDs.isEmpty && !isConnected(router: position, satellites: []) { continue }
                 let s = score(row(candidate: c, tx: routerTx))
                 if s > bestScore { bestScore = s; bestC = c }
             }
-            routerPosition = points[candidateIndices[bestC]]
-            routerRow = row(candidate: bestC, tx: routerTx)
+            if bestC >= 0 {
+                routerPosition = points[candidateIndices[bestC]]
+                routerRow = row(candidate: bestC, tx: routerTx)
+            } else {
+                routerRow = directRow(at: routerPosition, tx: routerTx, sourceFloor: router.floor)
+            }
         }
         if token?.isCancelled == true { return nil }
         progress?(0.45)
 
         // 4. Satellites: greedy growth then coordinate-descent refinement, for each count considered.
-        let maxCount: Int
-        switch request.satellites {
-        case .automatic: maxCount = max(0, min(request.maxSatellites, 6))
-        case .exactly(let n): maxCount = max(0, min(n, 6))
-        }
-
         var configurations: [(router: SIMD2<Float>, satellites: [SIMD2<Float>], coverage: Float, score: Float)] = []
         var satellites: [SIMD2<Float>] = []
         var satelliteRows: [[Float]] = []
@@ -272,7 +286,7 @@ public enum PlacementOptimizer {
                 satelliteRows.append(row(candidate: bestC, tx: tx))
 
                 refine(
-                    router: &routerPosition, routerRow: &routerRow, routerMovable: !(request.lockRouter || router.isLocked) && router.floor == floor,
+                    router: &routerPosition, routerRow: &routerRow, routerMovable: routerMovable,
                     satellites: &satellites, satelliteRows: &satelliteRows
                 )
                 let best = combine([routerRow] + satelliteRows)
@@ -296,7 +310,7 @@ public enum PlacementOptimizer {
                         var testRouter = router
                         var testSats = satellites
                         if node == 0 { testRouter = position } else { testSats[node - 1] = position }
-                        if !testSats.isEmpty && !isConnected(router: testRouter, satellites: testSats) { continue }
+                        if (!testSats.isEmpty || !requiredFixedIDs.isEmpty) && !isConnected(router: testRouter, satellites: testSats) { continue }
                         var total: Float = 0
                         for p in 0..<pointCount {
                             total += weights[p] * utility.value(max(base[p], tx - loss[c * pointCount + p]))
@@ -333,7 +347,7 @@ public enum PlacementOptimizer {
         var chosen = configurations[chosenCount]
 
         // 6. Fine local search (±0.3 m) around each node with fresh rows.
-        let movable = !(request.lockRouter || router.isLocked) && router.floor == floor
+        let movable = routerMovable
         var nodes = [chosen.router] + chosen.satellites
         var rows = [directRow(at: chosen.router, tx: routerTx, sourceFloor: router.floor)] + chosen.satellites.enumerated().map { directRow(at: $0.element, tx: satelliteTx($0.offset)) }
         for node in nodes.indices {
@@ -351,7 +365,7 @@ public enum PlacementOptimizer {
                     guard inside, isPlaceable(p, walls: floorWalls, obstacles: obstacles) else { continue }
                     var test = nodes
                     test[node] = p
-                    if test.count > 1 && !isConnected(router: test[0], satellites: Array(test.dropFirst())) { continue }
+                    if (test.count > 1 || !requiredFixedIDs.isEmpty) && !isConnected(router: test[0], satellites: Array(test.dropFirst())) { continue }
                     let candidateRow = directRow(at: p, tx: tx)
                     let s = score(combine([base, candidateRow]))
                     if s > bestScore { bestScore = s; bestPosition = p; bestRow = candidateRow }
