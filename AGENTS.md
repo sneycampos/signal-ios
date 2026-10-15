@@ -8,14 +8,15 @@ Mesh Planner (Xcode target `MeshPlanner`) is an iOS 17+ Wi-Fi coverage planner b
 - `Sources/MeshPlannerUI/`: SwiftUI screens, RoomPlan capture, AR overlays, sheets, and PDF reporting.
 - `Sources/SignalApp/AppMain.swift`: app entry point and shared model injection.
 - `Sources/SignalTestRunner/`: command-line verification and benchmarks.
-- `Tests/MeshPlannerCoreTests/` and `Tests/Fixtures/`: automated tests and synthetic fixtures.
+- `Tests/MeshPlannerCoreTests/`: core tests; fixtures are built in code (`DefaultApartmentFixture`, synthetic captures).
+- `Tests/MeshPlannerUITests/`: end-to-end XCUITests in the iOS Simulator.
 - `Resources/`: asset catalog, Info.plist, and privacy manifest. `docs/` holds specifications; `site/` holds the static website.
 
 Keep RoomPlan/ARKit integration in MeshPlannerUI and reusable calculations in MeshPlannerCore. Map, inspector, coverage, and optimizer must share the propagation model.
 
 ## Build, Test, and Development Commands
 
-Use Xcode 16+ with Swift 6 and XcodeGen. Run commands from the repository root:
+Use Xcode 26+ (iOS 26 SDK) with Swift 6 and XcodeGen. Run commands from the repository root:
 
 ```bash
 xcodegen generate                      # regenerate MeshPlanner.xcodeproj

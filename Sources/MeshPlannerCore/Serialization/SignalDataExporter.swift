@@ -1,7 +1,7 @@
 import Foundation
 import simd
 
-/// Floorplan interchange document (the segment schema used by the web simulator in `web/wifi.html`).
+/// Floorplan interchange document (the segment schema of the external web simulator, not part of this repository).
 public struct SignalFloorplanDocument: Codable, Equatable, Sendable {
     public var version: String
     public var name: String
