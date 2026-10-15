@@ -1,87 +1,72 @@
-# Phase 6: Augmented Reality (AR) Pass-Through Mode
+# 06. AR walkthrough
 
-> **Architecture and implementation of true ARKit + RealityKit floor projection for live physical walkthroughs.**
+The AR walkthrough lays the coverage map on the real floor and shows the estimated signal where the phone is, so the user can walk the home and see where the signal drops.
 
----
-
-## 1. Concept: Physical World RF Overlay
-
-In AR mode, the user switches from the virtual 3D dollhouse model to their iPhone's camera pass-through view.
-
-As they walk through their actual hallway, kitchen, and bedrooms:
-- The RF Wi-Fi heatmap is **projected directly onto the physical floor**.
-- The walls detected during the RoomPlan session serve as physical occlusion masks: as you look through an open doorway, you see the signal spreading from the router in the next room.
-- As the user walks, their real-time device location acts as a dynamic **Signal Probe**, displaying live signal strength in dBm, SNR, and estimated throughput directly in an AR HUD.
+Code: `Sources/MeshPlannerUI/AR/ARWalkthroughView.swift` (`ARWalkthroughView`, `ARWalkSession`, `ARWalkDelegate`) and `WorldAlignment` in `Sources/MeshPlannerCore/Models/FloorplanProject.swift`.
 
 ---
 
-## 2. AR Tracking & Anchor Alignment
+## 1. Requirements
 
-```
-┌────────────────────────────────────────────────────────┐
-│                   ARKit World Session                  │
-│  • ARWorldTrackingConfiguration                        │
-│  • Scene Reconstruction with LiDAR Mesh                │
-│  • Plane Detection (.horizontal)                       │
-└──────────────────────────┬─────────────────────────────┘
-                           │
-                           ▼ Alignment Matrix
-┌────────────────────────────────────────────────────────┐
-│             RoomPlan to World Space Transform          │
-│  • Scanned floor origin (0, 0, 0) aligned to detected  │
-│    ARPlaneAnchor via persistent WorldMap / Relocalization│
-└──────────────────────────┬─────────────────────────────┘
-                           │
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│               RealityKit Render Pipeline               │
-│  • Floor Entity with Custom Emissive Surface Shader    │
-│  • Real-time Metal Heatmap Texture Sampled in World XZ │
-│  • Dynamic Occlusion Mesh (Walls hide far-side signal) │
-└────────────────────────────────────────────────────────┘
-```
+**More › View in augmented reality** is enabled only when all of these hold:
 
----
+- the project has a saved world map (`.<id>.worldmap`, written when a scan finishes normally, see [02 §5](02-lidar-capture-roomplan.md#5-project-creation));
+- the project has a `WorldAlignment` (set by the scan; the demo has none);
+- the heatmap has finished computing.
 
-## 3. Shader Projection on Physical Surfaces
+The device must support `ARWorldTrackingConfiguration` and camera access must be allowed. Each missing piece shows a specific message in the status pill (with **Open Settings** for the camera).
 
-In RealityKit, a custom `CustomMaterial` or `SurfaceShader` samples the Metal compute texture using the world-space $(X, Z)$ coordinate of the physical floor:
+## 2. Relocalization
 
-```metal
-#include <metal_stdlib>
-#include <RealityKit/RealityKit.h>
-using namespace metal;
+1. The world map is unarchived and set as `initialWorldMap` of an `ARWorldTrackingConfiguration` with horizontal plane detection. On LiDAR devices, scene reconstruction (`.mesh`) is turned on and used for occlusion, so real walls and furniture hide the overlay behind them.
+2. The session runs with `.resetTracking` and `.removeExistingAnchors`. The status reads **Point at the walls you scanned** until ARKit reports normal tracking, which means it has matched the scan.
+3. When tracking becomes normal the overlay is placed and the status changes to **Map on the floor**. If tracking is lost later (interruption, fast motion), the live reading is hidden and the status returns to relocalizing until it recovers.
 
-[[visible]]
-void wifiFloorSurfaceShader(realitykit::surface_parameters params) {
-    auto surface = params.surface();
-    
-    // World space position of current floor point
-    float3 worldPos = params.geometry().world_position();
-    
-    // Normalize coordinates into apartment bounds
-    float u = (worldPos.x - uniforms.originX) / uniforms.width;
-    float v = (worldPos.z - uniforms.originZ) / uniforms.depth;
-    
-    if (u >= 0.0 && u <= 1.0 && v >= 0.0 && v <= 1.0) {
-        constexpr sampler s(address::clamp_to_edge, filter::linear);
-        half4 signalColor = heatmapTexture.sample(s, float2(u, v));
-        
-        // Blend with subtle camera video pass-through
-        surface.set_emissive_color(signalColor.rgb * signalColor.a * 0.85);
-        surface.set_opacity(signalColor.a * uniforms.revealAlpha);
-    } else {
-        surface.set_opacity(0.0);
-    }
-}
-```
+The propagation model is built once, off the main actor, when AR opens.
 
----
+## 3. Placing the map
 
-## 4. Live Walkthrough Probe HUD
+The heatmap image (the same `CGImage` the 2D map shows, at the 0.1 m grid) is drawn on a flat quad:
 
-- As the user walks through the home with the phone in their hand:
-  - Phone world position $(x, z)$ is sampled at 60 Hz.
-  - An AR beacon icon floats above the phone's projected floor footprint.
-  - Floating pill: `📶 Living Room: -52 dBm | 866 Mbps (Excellent)`.
-  - When crossing behind a concrete wall or refrigerator: the color shifts to Orange/Red and a subtle haptic warning (`UINotificationFeedbackGenerator(.warning)`) alerts the user to signal degradation.
+- Size: the plan's width × depth in metres, with vertices at plan (0, 0) to (width, depth). The quad is two-sided, so it is visible from any angle.
+- Material: `UnlitMaterial` with the heatmap as texture, 70 % opacity.
+- Position: the world point of plan (0, 0), `alignment.worldPoint(fromPlan: .zero)`, at the floor's elevation plus 2 cm (to avoid z-fighting with the real floor).
+- Orientation: a rotation of `alignment.rotation` around the world Y axis.
+
+### Alignment math
+
+The converter stores how the scan was rotated and shifted ([02 §4.2](02-lidar-capture-roomplan.md#42-normalization)):
+
+$$p_{plan} = R(\theta)\,(x_{world}, z_{world}) + offset \qquad p_{world} = R(-\theta)\,(p_{plan} - offset)$$
+
+`elevation(for:floorHeight:)` returns the floor's recorded elevation from `floorElevations` or, for older projects, `floorY + floor × floorHeight`.
+
+## 4. Live reading
+
+Every 0.2 s (camera frames are throttled in the delegate and again in the session) the camera position is converted to a plan point with `planPoint(worldX:worldZ:)` and evaluated with `FloorplanViewModel.reading(...)`, the same function the 2D inspector uses. The card at the bottom shows:
+
+- the room (or "Here" outside rooms) and a grade icon in the scale's colour;
+- RSSI and the effective speed (limited by backhaul and the internet plan);
+- what the grade is good for.
+
+The reading uses the band and floor selected on the map when AR was opened.
+
+## 5. Errors
+
+| Situation | Message |
+| :--- | :--- |
+| Device without world tracking | "This device does not support augmented reality." |
+| Camera denied | "Camera access is turned off. Allow camera access in Settings to use augmented reality." |
+| No world map or it cannot be read | "No environment map for this project. Scan again to use AR." |
+| No alignment | "This project has no augmented reality data. Scan again to use AR." |
+| ARKit session failure, or the overlay cannot be built | The error, then "Close AR and reopen it to retry, or scan again." The session is paused. |
+
+Closing AR pauses the session and removes all anchors.
+
+## 6. Known limits
+
+- The overlay is placed once. Edits made while AR is open (there is no way to make them from the AR screen) are not reflected until AR is reopened.
+- There is no timeout or guidance when relocalization takes long; the user is expected to point at walls they scanned.
+- The world map comes from the end of the scan and stays on the device that scanned. A project saved after a scan error, or imported from a `.signalsim` file, has no world map; it must be scanned again to use AR.
+- Only the current floor's map is shown. Moving to another floor in the real home does not switch the overlay.
+- Accuracy depends on ARKit relocalization; alignment can only be checked on a physical LiDAR device ([08](08-testing-and-benchmarking.md#6-device-only-validation)).

@@ -166,7 +166,7 @@ All scripts use `set -euo pipefail`, accept `--help`, are safe to rerun, and con
 | `Resources/` | Assets and the privacy manifest. |
 | `scripts/` | One-shot build, test, screenshot and release scripts. |
 | `site/` | Static website (landing, privacy, support). |
-| `docs/` | Original specification (01–08), technical review and plan (09), App Store material. |
+| `docs/` | Technical documentation (architecture, scan pipeline, propagation, materials, UI, AR, storage, testing, optimizer), the review and plan, and App Store material. Start at [docs/README.md](docs/README.md). |
 | `project.yml` | XcodeGen source of the Xcode project. |
 
 The Xcode project, scheme, and modules are named MeshPlanner. The home-screen name stays Mesh Planner.

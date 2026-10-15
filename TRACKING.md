@@ -1,6 +1,6 @@
 # Implementation status
 
-> Updated 15/10/2026 · version 1.1.0 (build 3). The full plan and the rationale for each item are in [docs/09-revisao-e-plano.md](./docs/09-revisao-e-plano.md).
+> Updated 15/10/2026 · version 1.1.0 (build 3). The full plan and the rationale for each item are in [docs/09-review-and-plan.md](./docs/09-review-and-plan.md).
 
 ## Summary
 
@@ -25,8 +25,9 @@
 
 ## Verification
 
-- `swift test`: 87 tests in 8 suites (propagation, converter, field/scale/rate, optimizer/calibration, persistence, legacy-scan repair, room label layout, review regressions).
-- `swift run -c release SignalTestRunner`: map × inspector consistency and timings (full field ~1 ms, optimizer ~20 ms on the demo, Mac M-series).
+- `swift test`: 104 tests in 9 suites (propagation, converter, field/scale/rate, optimizer/calibration, optimizer never worse, persistence, legacy-scan repair, room label layout, review regressions). See [docs/08](./docs/08-testing-and-benchmarking.md).
+- `scripts/ui-test.sh`: 8 XCUITests in the simulator (7 run, 1 skipped).
+- `swift run -c release SignalTestRunner`: map × inspector consistency and timings (full field ~2 ms, optimizer with 0–3 satellites ~55 ms on the demo, Mac M-series).
 - App build in Swift 6 with no warnings.
 
 ## To validate on iPhone

@@ -1,73 +1,95 @@
-# Phase 8: Testing, Verification & Benchmarking
+# 08. Testing and benchmarks
 
-> **Automated test strategy, CPU vs Metal GPU mathematical verification, and thermal/memory performance gates.**
-
----
-
-## 1. Test Suite Architecture
-
-```
-ios-app/Tests/
-├── RFEngineTests/
-│   ├── FreeSpaceLossTests.swift      // FSPL validation across bands
-│   ├── WallCrossingTests.swift       // Oblique angle loss verification
-│   ├── ReflectionPathTests.swift     // Image method reflection validation
-│   └── ParityAuditTests.swift        // 100-point CPU vs Metal compute parity (delta < 0.05 dB)
-├── RoomPlanConverterTests/
-│   ├── SurfaceToSegmentTests.swift   // Wall dimensions & endpoints transform
-│   ├── ObjectCategoryTests.swift     // Refrigerator/bathtub auto-tagging
-│   └── MultiRoomStitchingTests.swift // Overlapping wall deduplication
-└── BenchmarkTests/
-    ├── ComputeKernelBench.swift      // 512x512 texture compute latency (< 8 ms)
-    └── AutoPlaceOptimizerBench.swift // Multi-point grid search (< 2.5 s)
-```
+What is tested, how to run it, and what can only be checked on a real device.
 
 ---
 
-## 2. Mathematical Parity Audit Test (Automated Gate)
+## 1. Quick reference
 
-To guarantee that the iOS Metal shader and the Swift pure CPU engine yield identical results down to decimal places:
+| Command | What it runs | Where |
+| :--- | :--- | :--- |
+| `swift test` | 104 core tests in 9 suites (Swift Testing) | macOS 14+ |
+| `swift test --filter PropagationModelTests` | One suite (any suite or test name works) | macOS |
+| `swift run -c release SignalTestRunner` | Consistency checks and timings | macOS |
+| `./scripts/test.sh [--runner] [--build-app]` | `swift test`, optionally the runner and an app build | macOS |
+| `./scripts/ui-test.sh [--headless]` | XCUITest suite in the iOS Simulator | Simulator |
+| `./scripts/build.sh` | Simulator build without signing; `--run --demo` launches the demo | Simulator |
 
-```swift
-import XCTest
-@testable import MeshPlannerCore
+`swift test` does not build `MeshPlannerUI`. After UI changes, compile the app (`./scripts/build.sh` or the `xcodebuild` command in the [README](../README.md)) or run the UI tests. The scripts require Xcode 26 or newer with the iOS 26 SDK.
 
-final class ParityAuditTests: XCTestCase {
-    func testCPUAndMetalParityAcrossRandomPoints() throws {
-        let walls = TestApartmentFixture.defaultWalls
-        let router = RFAccessPoint(id: "router", x: 0.5, z: 0.5, txPower: 20.0)
-        let engine = RFPropagationEngine()
-        
-        var maxDelta: Float = 0.0
-        
-        // Sample 100 pseudo-random points across the floorplan
-        for _ in 0..<100 {
-            let rx = Float.random(in: 0.5...13.5)
-            let rz = Float.random(in: 0.5...9.5)
-            let pt = SIMD2<Float>(rx, rz)
-            
-            let cpuRSSI = engine.getRSSI_CPU(at: pt, band: .fiveGHz, accessPoints: [router], walls: walls, reflectionsOn: true)
-            let metalRSSI = engine.getRSSI_Metal(at: pt, band: .fiveGHz, accessPoints: [router], walls: walls, reflectionsOn: true)
-            
-            let delta = abs(cpuRSSI - metalRSSI)
-            maxDelta = max(maxDelta, delta)
-            
-            XCTAssertLessThan(delta, 0.05, "Parity failure at (\(rx), \(rz)): CPU=\(cpuRSSI) vs Metal=\(metalRSSI), delta=\(delta)")
-        }
-        
-        print("100-point CPU vs Metal parity audit PASSED. Max delta: \(maxDelta) dB (limit 0.05 dB)")
-    }
-}
-```
+## 2. Core tests (`Tests/MeshPlannerCoreTests`)
 
----
+| Suite | File | Tests | Covers |
+| :--- | :--- | :---: | :--- |
+| Propagation model | `PropagationModelTests.swift` | 14 | Band ordering, metal shadows, transparent materials, reflections never weaken the direct path, obstacles counted once per object, wall joints do not leak, small scan gaps, inspector equals map, best server (not the sum), slab loss, calibration scaling. |
+| RoomPlan conversion | `RoomPlanConverterTests.swift` | 10 | Door and opening cuts, clear glass windows, axis alignment of rotated scans, obstacles, rooms from floors and sections, router marker inside the home, `WorldAlignment` round trip, perimeter partitions stay interior, corner welding. |
+| Signal field, scale and link rate | `FieldAndScaleTests.swift` | 8 | Coverage counts only the interior, demo coverage matches the probe, contours follow the threshold, grades and colours share thresholds, noise floor by width, link rate, backhaul limits, satellite chaining. |
+| Placement optimizer and calibration | `OptimizerAndCalibrationTests.swift` | 6 | Positions inside and off furniture, backhaul respected, more nodes never lower coverage, locked router stays, cancellation, calibration recovers a known model. |
+| Optimizer never worse | `OptimizerNeverWorseTests.swift` | 16 | The proposal is never worse than the current layout, router-only results are independent of the start and within 1 point of brute-force references, `compare()` matches the map, locked nodes, inactive satellites, tall plans, performance budgets. See [10 §5](10-placement-optimizer.md#5-accuracy-and-verification). |
+| Project store | `ProjectStoreTests.swift` | 8 | Save, list, load and delete; demo never saved; bounded backups; export/import round trip; web documents; legacy scan migration; malformed materials; renamed projects folder. |
+| Legacy scan repair | `RealScanTests.swift` | 4 | Every enclosed region becomes a room, no wall overlaps an opening, the heatmap fills every room, interior partitions are not brick. |
+| Room label layout | `RoomLabelLayoutTests.swift` | 4 | Labels never overlap, layout is deterministic, panning moves labels rigidly, labels do not move while dragging the pin or a router. |
+| Review regressions | `ReviewRegressionTests.swift` | 34 | One test per bug fixed in the reviews ([09](09-review-and-plan.md)): validation limits, save flushing and retry, optimizer invalidation, multi-floor paths and backhaul, world map handling, recovery from damaged files, live drag updates. |
 
-## 3. Performance & Thermal Benchmarks
+Tests build their fixtures in code (`DefaultApartmentFixture`, a synthetic legacy scan and small hand-built captures and projects) and use temporary folders for `ProjectStore`. Tests that use the view model run on the main actor.
 
-| Metric | Target Gate | Failure Threshold | Action on Failure |
-| :--- | :---: | :---: | :--- |
-| **Metal Kernel Dispatch** | $< 4.0\text{ ms}$ | $> 8.3\text{ ms}$ ($< 120\text{ FPS}$) | Downsample texture from $512\times512$ to $384\times384$ |
-| **Touch-to-Pixel Latency** | $< 16\text{ ms}$ | $> 33\text{ ms}$ (2-frame lag) | Direct uniform update in touch handler |
-| **Auto-Place Grid Search** | $< 2.0\text{ s}$ | $> 3.5\text{ s}$ | Coarsen candidate search from $0.5\text{m}$ to $0.8\text{m}$ |
-| **Peak Memory Footprint** | $< 120\text{ MB}$ | $> 200\text{ MB}$ | Flush temporary RealityKit entities |
-| **Thermal State** | `.nominal` | `.serious` / `.critical` | Drop frame rate from 120 FPS to 60 FPS |
+### Optimizer references
+
+The router-only references were computed once by brute force: every position on a fine grid scored with `SignalFieldGenerator` (reflections on) and the best candidates re-scored on the map's grid. The values are written in the test file with the method, so they can be recomputed if the model changes. Any change to the propagation model that moves these numbers must update the references on purpose.
+
+## 3. UI tests (`Tests/MeshPlannerUITests`)
+
+| Test | Checks |
+| :--- | :--- |
+| `testSmokeProjectListOpenMapBandToggleAndOptimizeSheet` | Open the project, switch bands, open the optimizer sheet. |
+| `testRoomLabelFramesUnchangedDuringProbeAndRouterDrag` | Room labels stay put while dragging. |
+| `testHeatmapUpdatesMidDragDuringRouterDrag` | Live heatmap publishes during a drag and a full one after it. |
+| `testUndoAfterFloorSwitch` | Undo works across a floor change. |
+| `testInspectorNameEditsSavedOnFocusLossWithoutRenamingOtherSelection` | Inspector text fields save to the right element. |
+| `testRouterOnlyOptimizeMatchesMapAndIsAlreadyBestAfterApply` | The optimizer's Before equals the map's percentage; after applying, a second run reports "already the best". |
+| `testFakeScanFailureWhileWarningOrCancelDialogOpen` | Scan error paths with dialogs open. |
+| `testImportRenamedSignalsimDuplicate` | Skipped: the system document picker cannot be driven; covered by a core test instead. |
+
+### Launch arguments (Debug builds only)
+
+| Argument | Effect |
+| :--- | :--- |
+| `-uitest-demo` | Uses a fresh temporary folder for projects, turns animations off, grants camera access and saves a demo-based project with a second floor. |
+| `-uitest-fake-scan-failure` | Fakes a scan session that fails, without a camera. |
+| `-openDemo` | Opens the demo apartment at launch. |
+| `-openSheet inspector\|equipment\|calibration\|optimizer\|perspective` | Opens a sheet or the 3D view after launch (used for screenshots). |
+
+A hidden `heatmap` element exposes `generation=N,live=M` so tests can wait for heatmap updates. Other identifiers include `mapCoveragePercent`, `bandToggle`, `band-<band>`, `router`, `satellite`, `probe`, `roomLabel-<name>`, `addSatellite`, `optimize`, `undo`, `mapLayers`, `backToProjects`, `satelliteCountPicker`, `optimizerAlreadyOptimal` and `optimizerCoverageChange`.
+
+## 4. SignalTestRunner
+
+`swift run -c release SignalTestRunner` loads the demo apartment and prints `[PASS]`/`[FAIL]` lines:
+
+- **Inspector = map:** the link budget at the probe equals `rssi(...)` within 0.001 dB.
+- **Full field:** cell count, time in ms and coverage.
+- **Map cell at probe:** the grid value is within 3 dB of the probe.
+- **Optimizer:** time in ms, recommended satellite count and estimated coverage for each count.
+
+It exits with status 1 if any check fails, so it can run in CI.
+
+## 5. Performance budgets
+
+| Work | Budget | Enforced by |
+| :--- | :--- | :--- |
+| Router-only optimization (demo) | < 600 ms in a debug build | `optimizerPerformanceBudget` |
+| Router + 0–3 satellites, automatic (demo) | < 1,500 ms in a debug build | `optimizerPerformanceBudget` |
+| Inspector vs map | < 0.001 dB | `linkBudgetMatchesFastPath`, runner |
+
+Release builds are much faster (see [01 §7](01-architecture-and-vision.md#7-performance)). There is no automated memory or thermal test.
+
+## 6. Device-only validation
+
+The simulator and macOS cannot exercise these; check them on a LiDAR iPhone or iPad Pro before a release:
+
+- [ ] Scan two or more rooms with **Next room**, including a closed door, an open door and a window; walls are cut at each.
+- [ ] Mark the router during the scan; it appears locked at that spot.
+- [ ] Scan two floors in one session; both floors appear with the right rooms.
+- [ ] Background the app during a scan; **Save N rooms** keeps the captured rooms.
+- [ ] Open AR after a scan; it relocalizes, the map lies on the floor aligned with the walls, and the live reading changes as you walk.
+- [ ] Compare a few readings from AirPort Utility with the map, then calibrate; the error after is lower.
+- [ ] Share a project by AirDrop to another device and open it there.

@@ -1,92 +1,111 @@
-# Phase 1: Architecture & Technical Vision
+# 01. Architecture
 
-> **Comprehensive system design and technical architecture for Signal on iOS.**
-
----
-
-## 1. Vision & Purpose
-
-`Signal: Wi-Fi LiDAR` bridges the physical world of real homes and offices with physical radio frequency (RF) propagation mathematics. Using Apple's LiDAR Scanner and the **RoomPlan API**, the app scans rooms in seconds, reconstructs the floorplan with semantic understanding (walls, doors, windows, metal appliances, bathtubs), and runs a real-time electromagnetic wave propagation simulation directly on the device's Apple Silicon GPU via **Metal**.
-
-The user can drag access points (routers, mesh nodes), observe coverage heatmaps in 2.4, 5, and 6 GHz, identify dead zones, inspect the exact dB link-budget waterfall of each wall crossing, and project the Wi-Fi field onto their real floor using Augmented Reality.
+What Mesh Planner does, how the code is organized, and the rules that keep it consistent.
 
 ---
 
-## 2. Technology Stack & Frameworks
+## 1. Product
 
-| Subsystem | Framework / Technology | Justification |
+Mesh Planner (store name *Wi-Fi Mesh Planner: LiDAR Scan*) turns a LiDAR scan of a home into a Wi-Fi coverage map and finds the best positions for the router and mesh satellites.
+
+1. **Scan** the home room by room with RoomPlan, marking where the router is ([02](02-lidar-capture-roomplan.md)).
+2. The scan becomes an **RF floor plan**: walls cut at doors and windows, materials per wall, appliances as obstacles, rooms and floors ([04](04-materials-and-semantics.md)).
+3. A **propagation model** estimates the signal everywhere ([03](03-rf-propagation-engine.md)); the map shows coverage per room and the signal, speed and calculation at any point ([05](05-interactive-ui-ux.md)).
+4. **Best placement** proposes router and satellite positions, compared with the current layout before anything is applied ([10](10-placement-optimizer.md)).
+5. **Calibration** with real measurements tunes the model; **AR** draws the map on the real floor ([06](06-ar-floor-overlay.md)); projects can be shared, imported and exported as a PDF report ([07](07-export-sync-and-sharing.md)).
+
+Everything runs on the device: no account, no network calls, no analytics. The app is English only.
+
+## 2. Targets and modules
+
+| Target | Kind | Contents |
 | :--- | :--- | :--- |
-| **UI & Application State** | `SwiftUI` + `Observation` (`@Observable`) | Native iOS Human Interface Guidelines, fluid animations, Dynamic Type, Dark Mode |
-| **Room & Floor Scanning** | `RoomPlan` (`RoomCaptureSession`, `RoomCaptureView`) | Apple's official LiDAR-powered parametric room reconstruction framework |
-| **3D Rendering (Dollhouse)** | `RealityKit` / `SceneKit` + `MetalKit` | High-performance 3D scene graph, physically-based materials, custom shader textures |
-| **RF Heatmap Compute** | `Metal` (Metal Shading Language - MSL) | 120 FPS real-time parallel ray casting and multipath image method compute on Apple GPU |
-| **Augmented Reality (AR Mode)** | `ARKit` (`ARWorldTrackingConfiguration`) | Millimeter-accurate horizontal plane anchoring and world camera tracking |
-| **File I/O & Interchange** | `Codable` (JSON) + `USDZ` / `ModelIO` | Interoperable floorplan schema compatible with `web/wifi.html` and 3D CAD tools |
-| **Audio & Haptics** | `CoreHaptics` + `UIImpactFeedbackGenerator` | Subtle tactile feedback when placing routers, snapping to walls, or auto-optimizing |
+| `MeshPlannerCore` | Framework and Swift package library | Models, propagation engine, signal field, optimizer, backhaul, calibration, RoomPlan conversion (on plain structs), persistence and `FloorplanViewModel`. No UIKit, RoomPlan or ARKit, so it builds and tests on macOS. |
+| `MeshPlannerUI` | Framework | SwiftUI screens, RoomPlan capture, AR walkthrough, sheets, PDF report. |
+| `MeshPlanner` | iOS app | `Sources/SignalApp/AppMain.swift`: creates the shared view model and the window. |
+| `SignalTestRunner` | Command-line tool | Consistency checks and timings (`swift run -c release SignalTestRunner`). |
+| `MeshPlannerCoreTests` | Swift Testing | Core tests, run with `swift test`. |
+| `MeshPlannerUITests` | XCUITest | End-to-end tests in the iOS Simulator. |
 
----
-
-## 3. High-Level System Architecture
+The Xcode project is generated from `project.yml` with XcodeGen; `Package.swift` builds the core, the runner and the core tests. Swift 6 language mode with complete strict concurrency, iOS 17+, iPhone (portrait) and iPad.
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        SwiftUI Presentation Layer                      │
-│  ┌────────────────────────┬──────────────────────────────────────────┐ │
-│  │ RoomCaptureView (Scan) │ Main Floorplan View (3D Dollhouse / Top) │ │
-│  └───────────┬────────────┴────────────────────┬─────────────────────┘ │
-│              │                                 │                       │
-│              ▼                                 ▼                       │
-│  ┌───────────────────────┐       ┌───────────────────────────────────┐ │
-│  │ RoomPlanCaptureManager│       │   FloorplanInteractiveViewModel   │ │
-│  └───────────┬───────────┘       └─────────────────┬─────────────────┘ │
-└──────────────┼─────────────────────────────────────┼───────────────────┘
-               │                                     │
-               ▼                                     ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                            Domain / Core Model                         │
-│  • CapturedStructure / RFEnvironment (Walls, Openings, Obstacles)      │
-│  • MaterialCatalog (Dielectric properties, attenuation per band)       │
-│  • AccessPointGroup (Router, Satellites, Probe, Client Devices)        │
-└──────────────────────────────────┬─────────────────────────────────────┘
-                                   │
-                                   ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                     RF Simulation Engine (Dual-Core)                   │
-│  ┌───────────────────────────────────┬───────────────────────────────┐ │
-│  │        Swift CPU Engine           │       Metal GPU Compute       │ │
-│  │   • Pure getRSSI() function       │   • Parallel Heatmap Compute  │ │
-│  │   • Probe link-budget waterfall   │   • Dynamic 120 FPS Texture   │ │
-│  │   • Auto-Place grid search        │   • Wavefront pulse generator │ │
-│  └───────────────────────────────────┴───────────────────────────────┘ │
-└──────────────────────────────────┬─────────────────────────────────────┘
-                                   │
-                                   ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                     Visualization & AR Output Layer                    │
-│  • RealityKit 3D Dollhouse Viewport (Custom floor shader with texture) │
-│  • ARKit World-Space Floor Overlay (Augmented reality in real room)    │
-│  • Universal JSON Export & PDF Wi-Fi Health Audit Generation           │
-└────────────────────────────────────────────────────────────────────────┘
+Sources/
+├── SignalApp/            app entry point
+├── MeshPlannerUI/
+│   ├── AppRootView.swift navigation, import, scan entry, error alert
+│   ├── Home/             project list, demo, scan and import buttons
+│   ├── Map/              map screen, canvas, plan drawing, legend, band picker
+│   ├── Sheets/           inspector, equipment, optimizer, calibration, diagnostics, report
+│   ├── Scan/             ScanController, RoomScanView, RoomPlanExtraction
+│   ├── AR/               ARWalkthroughView
+│   ├── Report/           ReportRenderer (PDF)
+│   └── Style/            theme, colours, document types, support links
+└── MeshPlannerCore/
+    ├── Engine/           RFPropagationEngine (PropagationModel), SignalField,
+    │                     PlacementOptimizer, BackhaulPlanner, LinkRateModel, Calibrator
+    ├── Converters/       RoomPlanConverter, ProjectRepair
+    ├── Geometry/         Geometry, RoomRegionDetector, RoomLabelLayout
+    ├── Models/           FloorplanProject, walls, APs, materials, bands, rooms,
+    │                     NetworkProfile, SignalScale, DefaultApartmentFixture
+    ├── Serialization/    ProjectStore, validation, web export, logger
+    └── ViewModels/       FloorplanViewModel
 ```
 
----
+## 3. Data flow
 
-## 4. Coordinate System & Normalization
+```
+RoomPlan (device) ──RoomPlanExtraction──▶ RoomPlanCapture (plain structs)
+                                              │ RoomPlanConverter
+                                              ▼
+                   ProjectStore ◀──save/load── FloorplanProject ──▶ FloorplanViewModel (@MainActor)
+                   (actor, files)                                    │
+                                    ┌──────────────┬─────────────────┼───────────────┬──────────────┐
+                                    ▼              ▼                 ▼               ▼              ▼
+                           SignalFieldGenerator  linkBudget   PlacementOptimizer  BackhaulPlanner  Calibrator
+                                    └──────────────┴──── PropagationModel (one model) ┴──────────────┘
+                                                             │
+                                                             ▼
+                                           Map, inspector, optimizer sheet, AR, PDF
+```
 
-1. **Units:** 1.0 unit = 1.0 meter (Apple ARKit standard).
-2. **LiDAR Coordinates (RoomPlan):** $+X$ is Right, $+Y$ is Up, $+Z$ is Backward (standard camera-space orientation).
-3. **Simulation Plane:**
-   - The RF simulation occurs on a horizontal plane at device elevation ($Y = 1.0\text{ m}$ above the floor plane $Y = 0.0\text{ m}$).
-   - The 3D bounding box of the apartment is normalized to a ground plane spanning $(0 \dots X_{\max})$ and $(0 \dots Z_{\max})$.
-4. **Precision:**
-   - Wall coordinates: Centimeter precision ($\pm 0.01\text{ m}$).
-   - RSSI calculations: Floating point (`Float32`) with accuracy within $\pm 0.05\text{ dBm}$.
+`FloorplanProject` is the single source of truth: walls, access points, rooms, furniture, network profile, calibration, measurements, probe, alignment for AR and the selected band. Every edit goes through the view model, which snapshots the project for undo, recomputes what changed and schedules a save.
 
----
+## 4. Rules that keep the numbers consistent
 
-## 5. Privacy, Performance & Device Requirements
+1. **One propagation model.** The heatmap, coverage percentage, room grades, point inspector, backhaul, calibration and optimizer all use `PropagationModel` with reflections. Tests check that the inspector equals the map at the same point.
+2. **One signal scale.** `SignalScale` defines thresholds, colours and labels for the map, legend, room chips, gauge, report and AR.
+3. **One coverage definition.** Coverage counts only cells inside rooms (`InteriorMask`). The map's final grid (0.1 m) is also the grid the optimizer sheet uses for Before/After, so the numbers match.
+4. **Best server.** A point is served by its strongest AP; powers are never summed across APs.
+5. **Never worse.** The optimizer's proposal is compared with the current layout and is only offered when it is clearly better.
 
-- **Local-First & Offline:** 100% of scanning, geometry processing, and RF simulation occurs strictly on-device. No floorplans or camera streams ever leave the iPhone.
-- **Battery & Thermal Efficiency:**
-  - Dynamic GPU throttling: While the user is interacting/dragging, the Metal compute kernel executes at 120 FPS. When idle, the frame rate reduces to 30 FPS with static caching.
-  - Zero redundant allocations: Wall segment buffers and ray pools are pre-allocated in unified memory (`MTLResourceStorageModeShared`).
+## 5. Coordinates and units
+
+- Metres everywhere. The plan's `x` is RoomPlan world X and the plan's `y` is world Z; world Y is height.
+- The converter rotates the scan so the walls line up with the axes and shifts it so the plan starts 0.3 m from the origin. `WorldAlignment` (rotation, offset, floor elevations) converts plan points back to world points for AR.
+- Floors are indexed from 0 (ground floor); each wall, room, AP and measurement has a floor.
+- Signal values are dBm as `Float`.
+
+## 6. Concurrency
+
+- `FloorplanViewModel` is `@MainActor @Observable`. Heavy work runs in detached tasks: the heatmap (live and full grids), backhaul, the optimizer, calibration, RoomPlan conversion and project thumbnails.
+- Every job takes a `CancellationToken` (a `Sendable` lock-protected flag) checked inside `concurrentPerform` loops, and a generation counter drops results that arrive after a newer request.
+- While dragging, live heatmap requests are coalesced: one in flight and at most one pending. Releasing the node cancels them and runs the full grid.
+- `ProjectStore` is an actor, so disk I/O never runs on the main actor. Saving is debounced (800 ms) and flushed when switching projects, closing, or entering the background.
+
+## 7. Performance
+
+Measured with `SignalTestRunner` (release build, M-series Mac) on the demo apartment (14 × 10 m), October 2026:
+
+| Work | Time | Guard |
+| :--- | :--- | :--- |
+| Full heatmap, 0.1 m grid (14,000 cells) | about 2 ms | Parallel over rows. |
+| Optimizer, router + 0–3 satellites (automatic) | about 55 ms | Test budget: < 1,500 ms in a debug build; router only < 600 ms. |
+
+Run `swift run -c release SignalTestRunner` for current numbers.
+
+## 8. Privacy
+
+- No account, analytics, tracking or network requests. Scans, projects and world maps stay in the app's folders until the user shares them.
+- The camera is used only for scanning and the AR walkthrough.
+- `Resources/PrivacyInfo.xcprivacy` declares no tracking and no collected data, and one required-reason API: file timestamps (`C617.1`), used to space backups.
