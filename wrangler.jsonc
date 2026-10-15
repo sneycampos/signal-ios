@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wifi-mesh-planner",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./site",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    { "pattern": "wifi-mesh-planner.sney.eu", "custom_domain": true }
+  ],
+  "workers_dev": false
+}

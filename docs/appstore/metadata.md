@@ -5,8 +5,9 @@
 - **Bundle ID:** com.silviogodinho.signal · **Version:** 1.1.0 (build 3)
 - **Primary category:** Utilities · **Secondary:** Productivity
 - **Age rating:** 4+ · **Price:** Free (suggested)
-- **Support URL:** https://github.com/sneycampos/signal-ios/issues
-- **Privacy policy URL:** https://sneycampos.github.io/signal-ios/privacy-policy (after enabling GitHub Pages on `docs/`)
+- **Support URL:** https://wifi-mesh-planner.sney.eu/support/
+- **Marketing URL:** https://wifi-mesh-planner.sney.eu/
+- **Privacy policy URL:** https://wifi-mesh-planner.sney.eu/privacy/ (source: `site/privacy/index.html`)
 
 ## English (en-US)
 
