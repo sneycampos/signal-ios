@@ -25,7 +25,7 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
-command -v swift >/dev/null 2>&1 || die "swift not found. Install Xcode and run: sudo xcode-select -s /Applications/Xcode.app"
+require_xcode
 cd "$ROOT"
 info "swift test"
 swift test

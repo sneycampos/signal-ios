@@ -48,10 +48,10 @@ pick_simulator() {
   local name="${SIMULATOR:-}"
   local line
   if [[ -n "$name" ]]; then
-    line=$(simulators | grep -F "    $name (" | awk 'NR==1' || true)
+    line=$(simulators | grep -F "    $name (" | tail -n 1 || true)
     [[ -n "$line" ]] || die "No available simulator named '$name'. See: xcrun simctl list devices available"
   else
-    line=$(simulators | grep -E "^ +iPhone" | awk 'NR==1' || true)
+    line=$(simulators | grep -E "^ +iPhone" | tail -n 1 || true)
     [[ -n "$line" ]] || die "No iPhone simulator available. Install an iOS runtime in Xcode > Settings > Components."
   fi
   echo "$line" | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/'

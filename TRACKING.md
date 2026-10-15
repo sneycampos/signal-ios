@@ -1,6 +1,6 @@
 # Implementation status
 
-> Updated 27/09/2026 · version 1.1.0 (build 2). The full plan and the rationale for each item are in [docs/09-revisao-e-plano.md](./docs/09-revisao-e-plano.md).
+> Updated 15/10/2026 · version 1.1.0 (build 3). The full plan and the rationale for each item are in [docs/09-revisao-e-plano.md](./docs/09-revisao-e-plano.md).
 
 ## Summary
 
@@ -21,11 +21,11 @@
 | AR with heatmap on the floor | Implemented | Requires a project scanned with this version. Validate orientation on device. |
 | Projects, backups, `.signalsim`, PDF | Implemented | |
 | Accessibility, English-only | Implemented | No in-app translations. |
-| App Store (privacy manifest, metadata) | Pending | Out of scope for this stage. |
+| App Store (privacy manifest, metadata) | Implemented | Privacy manifest bundled in app and framework; metadata and support links included. |
 
 ## Verification
 
-- `swift test`: 50 tests in 6 suites (propagation, converter, field/scale/rate, optimizer/calibration, persistence, legacy-scan repair).
+- `swift test`: 83 tests in 7 suites (propagation, converter, field/scale/rate, optimizer/calibration, persistence, legacy-scan repair, review regressions).
 - `swift run -c release SignalTestRunner`: map × inspector consistency and timings (full field ~1 ms, optimizer ~20 ms on the demo, Mac M-series).
 - App build in Swift 6 with no warnings.
 

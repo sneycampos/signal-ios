@@ -50,8 +50,7 @@ def make(shot,head,sub,W,H,out,ipad):
         d.text((W/2,y),l,font=sf,fill=(190,230,220),anchor='ma'); y+=int(sf.size*1.3)
     top=y+int(H*0.035)
     sc=Image.open(shot).convert('RGB')
-    avail_h=H-top+int(H*0.12)  # let device bleed off bottom
-    sw=int(W*(0.80 if ipad else 0.80)); sh=int(sw*sc.height/sc.width)
+    sw=int(W*0.80); sh=int(sw*sc.height/sc.width)
     sc=sc.resize((sw,sh),Image.LANCZOS)
     bez=int(sw*0.028); r=int(sw*(0.06 if ipad else 0.13))
     fw,fh=sw+2*bez,sh+2*bez; x=(W-fw)//2
