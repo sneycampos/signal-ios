@@ -104,7 +104,7 @@ struct OptimizerSheet: View {
                     }
                 }
             } footer: {
-                Text("Looks for positions indoors, away from walls and furniture, that maximize the area with good signal on \(model.project?.profile.planningBand.displayName ?? "5 GHz"). Each Wi-Fi satellite needs backhaul of at least −70 dBm.")
+                Text("Looks for positions indoors, away from walls and furniture, that maximize the area with good signal on \(model.band.displayName). Each Wi-Fi satellite needs backhaul of at least −70 dBm.")
             }
             Section {
                 Button {
