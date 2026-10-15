@@ -109,17 +109,13 @@ public actor ProjectStore {
 
     public func load(id: String) throws -> FloorplanProject {
         guard Self.safeID(id) else { throw ProjectStoreError.unreadableFile }
-        if let project = try? Self.readProject(at: fileURL(for: id)), project.id == id {
-            let upgraded = ProjectRepair.upgradeIfNeeded(project)
-            try upgraded.validate()
+        if let (project, upgraded) = try? Self.readAndUpgrade(at: fileURL(for: id), id: id) {
             if upgraded.schemaVersion != project.schemaVersion { try save(upgraded) }
             return upgraded
         }
         // The main file is damaged: fall back to the newest readable backup.
         for backup in backups(for: id) {
-            if let project = try? Self.readProject(at: backup), project.id == id {
-                let upgraded = ProjectRepair.upgradeIfNeeded(project)
-                try upgraded.validate()
+            if let (_, upgraded) = try? Self.readAndUpgrade(at: backup, id: id) {
                 try save(upgraded)
                 return upgraded
             }
@@ -250,15 +246,15 @@ public actor ProjectStore {
     // MARK: Legacy migration
 
     /// Converts the single-slot scan saved by earlier versions into a project, once.
-    public func migrateLegacyScanIfNeeded() -> FloorplanProject? {
+    public func migrateLegacyScanIfNeeded() throws -> FloorplanProject? {
         let fm = FileManager.default
         let legacy = legacyDirectory.appendingPathComponent("current_scan.json")
         guard fm.fileExists(atPath: legacy.path) else { return nil }
-        guard let data = try? Data(contentsOf: legacy),
-              let state = try? Self.decoder().decode(LegacyScanState.self, from: data) else { return nil }
-        guard let project = try? state.toProject() else { return nil }
-        guard (try? save(project)) != nil else { return nil }
-        try? fm.moveItem(at: legacy, to: legacyDirectory.appendingPathComponent("current_scan.migrated.json"))
+        let data = try Self.readData(at: legacy)
+        let state = try Self.decoder().decode(LegacyScanState.self, from: data)
+        let project = try state.toProject()
+        try save(project)
+        try fm.moveItem(at: legacy, to: legacyDirectory.appendingPathComponent("current_scan.migrated.json"))
         return project
     }
 
@@ -274,5 +270,13 @@ public actor ProjectStore {
 
     private static func readProject(at url: URL) throws -> FloorplanProject {
         try decoder().decode(FloorplanProject.self, from: readData(at: url))
+    }
+
+    private static func readAndUpgrade(at url: URL, id: String) throws -> (FloorplanProject, FloorplanProject) {
+        let project = try readProject(at: url)
+        guard project.id == id else { throw ProjectStoreError.unreadableFile }
+        let upgraded = ProjectRepair.upgradeIfNeeded(project)
+        try upgraded.validate()
+        return (project, upgraded)
     }
 }

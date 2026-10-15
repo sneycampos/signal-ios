@@ -205,8 +205,15 @@ public struct PropagationModel: Sendable {
         // Reciprocal approximation: each endpoint floor contributes half of the projected path.
         let walls: Float
         if floors > 0 {
-            walls = 0.5 * (wallLoss(ap.position.x, ap.position.y, p.x, p.y, floor: ap.floor, emit: emit)
-                + wallLoss(ap.position.x, ap.position.y, p.x, p.y, floor: floor, emit: emit))
+            let scaledEmit: ((WallHit) -> Void)? = emit.map { callback in
+                { hit in
+                    var scaled = hit
+                    scaled.loss *= 0.5
+                    callback(scaled)
+                }
+            }
+            walls = 0.5 * (wallLoss(ap.position.x, ap.position.y, p.x, p.y, floor: ap.floor, emit: scaledEmit)
+                + wallLoss(ap.position.x, ap.position.y, p.x, p.y, floor: floor, emit: scaledEmit))
         } else {
             walls = wallLoss(ap.position.x, ap.position.y, p.x, p.y, floor: floor, emit: emit)
         }

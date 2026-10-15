@@ -155,18 +155,18 @@ public struct NetworkProfile: Codable, Equatable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = NetworkProfile()
         self.init(
-            standard: (try? c.decode(WifiStandard.self, forKey: .standard)) ?? d.standard,
-            clientStreams: (try? c.decode(Int.self, forKey: .clientStreams)) ?? d.clientStreams,
-            channelWidth24: (try? c.decode(Int.self, forKey: .channelWidth24)) ?? d.channelWidth24,
-            channelWidth5: (try? c.decode(Int.self, forKey: .channelWidth5)) ?? d.channelWidth5,
-            channelWidth6: (try? c.decode(Int.self, forKey: .channelWidth6)) ?? d.channelWidth6,
-            internetPlanMbps: (try? c.decode(Int.self, forKey: .internetPlanMbps)) ?? d.internetPlanMbps,
-            construction: (try? c.decode(ConstructionProfile.self, forKey: .construction)) ?? d.construction,
-            coverageThreshold: (try? c.decode(Float.self, forKey: .coverageThreshold)) ?? d.coverageThreshold,
-            dedicatedBackhaulRadio: (try? c.decode(Bool.self, forKey: .dedicatedBackhaulRadio)) ?? d.dedicatedBackhaulRadio,
-            backhaulBand: (try? c.decode(RFBand.self, forKey: .backhaulBand)) ?? d.backhaulBand,
-            floorHeight: (try? c.decode(Float.self, forKey: .floorHeight)) ?? d.floorHeight,
-            palette: (try? c.decode(HeatmapPalette.self, forKey: .palette)) ?? d.palette
+            standard: (try c.decodeIfPresent(WifiStandard.self, forKey: .standard)) ?? d.standard,
+            clientStreams: (try c.decodeIfPresent(Int.self, forKey: .clientStreams)) ?? d.clientStreams,
+            channelWidth24: (try c.decodeIfPresent(Int.self, forKey: .channelWidth24)) ?? d.channelWidth24,
+            channelWidth5: (try c.decodeIfPresent(Int.self, forKey: .channelWidth5)) ?? d.channelWidth5,
+            channelWidth6: (try c.decodeIfPresent(Int.self, forKey: .channelWidth6)) ?? d.channelWidth6,
+            internetPlanMbps: (try c.decodeIfPresent(Int.self, forKey: .internetPlanMbps)) ?? d.internetPlanMbps,
+            construction: (try c.decodeIfPresent(ConstructionProfile.self, forKey: .construction)) ?? d.construction,
+            coverageThreshold: (try c.decodeIfPresent(Float.self, forKey: .coverageThreshold)) ?? d.coverageThreshold,
+            dedicatedBackhaulRadio: (try c.decodeIfPresent(Bool.self, forKey: .dedicatedBackhaulRadio)) ?? d.dedicatedBackhaulRadio,
+            backhaulBand: (try c.decodeIfPresent(RFBand.self, forKey: .backhaulBand)) ?? d.backhaulBand,
+            floorHeight: (try c.decodeIfPresent(Float.self, forKey: .floorHeight)) ?? d.floorHeight,
+            palette: (try c.decodeIfPresent(HeatmapPalette.self, forKey: .palette)) ?? d.palette
         )
         normalizeChannelWidths()
     }

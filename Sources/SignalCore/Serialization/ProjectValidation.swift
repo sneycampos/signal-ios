@@ -18,7 +18,7 @@ extension FloorplanProject {
               walls.allSatisfy({ w in
                   point(w.p1) && point(w.p2) && validFloor(w.floor) && bounded(w.height, 100) && bounded(w.thickness, 100)
                       && w.material.crossingLoss.allSatisfy { bounded($0, 1_000) }
-                      && bounded(w.material.reflectionLoss, 10_000)
+                      && bounded(w.material.reflectionLoss, 10_000) && w.material.reflectionLoss >= 0
               }),
               rooms.allSatisfy({ validFloor($0.floor) && $0.polygon.count <= 2_048 && $0.polygon.allSatisfy(point) }),
               accessPoints.allSatisfy({ validFloor($0.floor) && point($0.position) && bounded($0.txPower, 100) }),

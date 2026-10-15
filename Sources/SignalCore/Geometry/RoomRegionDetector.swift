@@ -16,6 +16,11 @@ public enum RoomRegionDetector {
         let barriers = walls.filter { $0.floor == floor && $0.isActive && $0.kind != .obstacle && $0.length > 0.05 }
         guard !barriers.isEmpty else { return [] }
 
+        // Migration and scan repair also use this raster; cap it before allocating or converting to Int.
+        guard width.isFinite, depth.isFinite, width > 0, depth > 0, cell.isFinite, cell > 0 else { return [] }
+        let grid = FieldGrid.covering(width: width, depth: depth, targetCell: max(cell, max(width, depth) / 1_000), maxCells: 240_000)
+        let cell = grid.cell
+
         let pad = 3
         let origin = SIMD2<Float>(-Float(pad) * cell, -Float(pad) * cell)
         let cols = Int(ceil(width / cell)) + pad * 2

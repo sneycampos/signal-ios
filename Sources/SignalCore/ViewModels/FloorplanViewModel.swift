@@ -157,8 +157,12 @@ public final class FloorplanViewModel {
     // MARK: - Lifecycle
 
     public func start() async {
-        if let migrated = await store.migrateLegacyScanIfNeeded() {
-            SignalDebugLogger.shared.log("Migrated legacy scan to project \(migrated.id)", category: "Store")
+        do {
+            if let migrated = try await store.migrateLegacyScanIfNeeded() {
+                SignalDebugLogger.shared.log("Migrated legacy scan to project \(migrated.id)", category: "Store")
+            }
+        } catch {
+            errorMessage = "Couldn't migrate the saved scan. The original scan is preserved. \(error.localizedDescription)"
         }
         await refreshProjects()
     }
@@ -184,22 +188,27 @@ public final class FloorplanViewModel {
     public func open(id: String) async {
         do {
             let loaded = try await store.load(id: id)
-            hasWorldMap = await store.worldMap(for: id) != nil
-            await present(loaded)
+            let hasMap = await store.worldMap(for: id) != nil
+            await present(loaded, hasWorldMap: hasMap)
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
     public func openDemo() async {
-        hasWorldMap = false
         await present(DefaultApartmentFixture.makeProject())
     }
 
-    private func present(_ newProject: FloorplanProject) async {
-        guard await flushSave() else { return }
+    @discardableResult
+    private func present(_ newProject: FloorplanProject, hasWorldMap: Bool = false) async -> Bool {
+        guard await flushSave(), !Task.isCancelled else { return false }
         cancelOptimizer()
+        backhaulTask?.cancel()
         project = newProject
+        self.hasWorldMap = hasWorldMap
+        dirty = false
+        draggingAccessPointId = nil
+        dragStart = nil
         floor = min(newProject.probeFloor, newProject.floorCount - 1)
         selection = nil
         tool = .normal
@@ -214,8 +223,10 @@ public final class FloorplanViewModel {
         weakContours = []
         cachedModel = nil
         backhaulKey = nil
+        backhaul = [:]
         refreshInstant()
         recompute(quality: .full)
+        return true
     }
 
     public func close() async {
@@ -226,6 +237,9 @@ public final class FloorplanViewModel {
         computeGeneration += 1
         isComputing = false
         project = nil
+        hasWorldMap = false
+        draggingAccessPointId = nil
+        dragStart = nil
         field = nil
         heatmapImage = nil
         probe = nil
@@ -251,10 +265,21 @@ public final class FloorplanViewModel {
         if project?.id == id {
             saveTask?.cancel()
             computeTask?.cancel()
+            backhaulTask?.cancel()
             computeGeneration += 1
             cancelOptimizer()
             dirty = false
             project = nil
+            hasWorldMap = false
+            field = nil
+            heatmapImage = nil
+            probe = nil
+            backhaul = [:]
+            coverage = .empty
+            roomCoverage = []
+            coverageContours = []
+            weakContours = []
+            isComputing = false
         }
         await refreshProjects()
     }
@@ -299,18 +324,28 @@ public final class FloorplanViewModel {
             floorCount: converted.floorCount
         )
         do {
+            try Task.checkCancellation()
             try await store.save(newProject)
+            try Task.checkCancellation()
+            var savedWorldMap = false
             if let worldMap {
-                try await store.saveWorldMap(worldMap, for: newProject.id)
+                do {
+                    try await store.saveWorldMap(worldMap, for: newProject.id)
+                    savedWorldMap = true
+                } catch {
+                    errorMessage = "Your plan was saved, but its AR environment map couldn't be saved. Scan again to enable AR. \(error.localizedDescription)"
+                }
             }
-            hasWorldMap = worldMap != nil
-            await present(newProject)
+            try Task.checkCancellation()
+            guard await present(newProject, hasWorldMap: savedWorldMap) else { return }
             if converted.routerPosition == nil {
                 tool = .placeRouter
             }
             shouldPresentSetup = true
             await refreshProjects()
             SignalDebugLogger.shared.log("Created project: \(converted.walls.count) segments, \(converted.rooms.count) rooms, \(converted.floorCount) floor(s)", category: "Scan")
+        } catch is CancellationError {
+            return
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -322,8 +357,7 @@ public final class FloorplanViewModel {
         do {
             let imported = try await store.importProject(from: url)
             await refreshProjects()
-            hasWorldMap = false
-            await present(imported)
+            guard await present(imported) else { return }
             toast = ToastMessage(text: "Project imported.", offersUndo: false)
         } catch {
             errorMessage = error.localizedDescription
@@ -377,6 +411,7 @@ public final class FloorplanViewModel {
         let apFloor = project.accessPoints[index].floor
         guard let position = validPosition(target, floor: apFloor, previous: project.accessPoints[index].position) else { return }
         self.project?.accessPoints[index].position = position
+        if !project.isDemo { dirty = true }
         invalidateOptimizer()
         refreshInstant()
         recompute(quality: draggingAccessPointId == nil ? .full : .live)
@@ -564,7 +599,7 @@ public final class FloorplanViewModel {
                 guard let proposal, !token.isCancelled else { return nil }
                 return FloorplanViewModel.compare(project: snapshot, proposal: proposal, floor: currentFloor)
             }.value
-            guard let self, !token.isCancelled, self.project == snapshot, self.floor == currentFloor else { return }
+            guard let self, !token.isCancelled, self.optimizerMatches(snapshot), self.floor == currentFloor else { return }
             if let comparison {
                 self.optimizer = .ready(comparison)
             } else {
@@ -592,8 +627,16 @@ public final class FloorplanViewModel {
         optimizerSnapshot = nil
     }
 
+    /// Probe movement does not change the placement problem or invalidate a proposal.
+    private func optimizerMatches(_ snapshot: FloorplanProject) -> Bool {
+        guard var current = project else { return false }
+        current.probe = snapshot.probe
+        current.probeFloor = snapshot.probeFloor
+        return current == snapshot
+    }
+
     public func applyOptimizerResult() {
-        guard case .ready(let comparison) = optimizer, project == optimizerSnapshot,
+        guard case .ready(let comparison) = optimizer, let snapshot = optimizerSnapshot, optimizerMatches(snapshot),
               project?.id == comparison.projectID, floor == comparison.floor else { invalidateOptimizer(); return }
         let proposal = comparison.proposal
         let currentFloor = floor
@@ -746,6 +789,7 @@ public final class FloorplanViewModel {
         if backhaulKey?.accessPoints != project.accessPoints || backhaulKey?.walls != project.walls || backhaulKey?.profile != project.profile || backhaulKey?.calibration != project.calibration {
             backhaulKey = project
             backhaulTask?.cancel()
+            backhaul = [:]
             let token = CancellationToken()
             backhaulTask = Task { [weak self] in
                 let links = await withTaskCancellationHandler {
