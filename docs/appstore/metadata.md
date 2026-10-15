@@ -2,7 +2,7 @@
 
 - **Home-screen name (CFBundleDisplayName):** Mesh Planner
 
-- **Bundle ID:** com.silviogodinho.signal · **Version:** 1.1.0 (build 2)
+- **Bundle ID:** com.silviogodinho.signal · **Version:** 1.1.0 (build 3)
 - **Primary category:** Utilities · **Secondary:** Productivity
 - **Age rating:** 4+ · **Price:** Free (suggested)
 - **Support URL:** https://github.com/sneycampos/signal-ios/issues
@@ -12,7 +12,7 @@
 
 - **Name (≤30):** Wi-Fi Mesh Planner: LiDAR Scan
 - **Subtitle (≤30):** Wi-Fi heatmap & router planner
-- **Keywords (≤100):** wifi,heatmap,mesh,router,coverage,lidar,roomplan,signal,dead zone,satellite,floor plan,network
+- **Keywords (≤100):** wifi,heatmap,mesh,router,coverage,lidar,signal,dead zone,3d scan,satellite,floor plan,network
 - **Promotional text (≤170):** Scan your home with LiDAR, place your router and mesh satellites, and see where Wi-Fi will reach before you buy or move anything.
 - **Description:**
 
