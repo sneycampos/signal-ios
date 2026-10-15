@@ -406,4 +406,190 @@ extension ReviewRegressionTests {
         let data = try JSONSerialization.data(withJSONObject: json)
         #expect(throws: (any Error).self) { try ProjectStore.decodeAnyFormat(data, fallbackName: "Invalid") }
     }
+
+    @Test func converterDeduplicatesIDsAndBoundsFloorY() throws {
+        let wallA = RoomPlanRawSurface(id: "shared-wall", p1: [0, 0], p2: [4, 0], category: "wall")
+        let wallB = RoomPlanRawSurface(id: "shared-wall", p1: [4, 0], p2: [4, 4], category: "wall")
+        let objA = RoomPlanRawObject(id: "shared-fridge", position: [1, 1], dimensions: [0.8, 0.8], category: "refrigerator")
+        let objB = RoomPlanRawObject(id: "shared-fridge", position: [3, 3], dimensions: [0.8, 0.8], category: "refrigerator")
+        let capture = RoomPlanCapture(
+            surfaces: [wallA, wallB],
+            objects: [objA, objB],
+            floors: [RoomPlanRawFloor(polygon: [[0, 0], [4, 0], [4, 4], [0, 4]], y: .greatestFiniteMagnitude)],
+            floorY: .greatestFiniteMagnitude
+        )
+        let converted = RoomPlanConverter.convert(capture)
+        let created = FloorplanProject(
+            name: "Merged fallback",
+            width: converted.width,
+            depth: converted.depth,
+            walls: converted.walls,
+            accessPoints: [RFAccessPoint(name: "Router", position: [2, 2])],
+            rooms: converted.rooms,
+            furniture: converted.furniture,
+            probe: [2, 2],
+            worldAlignment: converted.alignment,
+            floorCount: converted.floorCount
+        )
+        try created.validate()
+        #expect(Set(created.walls.map { $0.id }).count == created.walls.count)
+        #expect(Set(created.furniture.map { $0.id }).count == created.furniture.count)
+        #expect(converted.alignment.floorY == 0)
+    }
+
+    @Test @MainActor func explicitlyUnlockingRouterAllowsOptimizerToMoveIt() async throws {
+        let (store, root) = try store()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var p = project()
+        p.accessPoints[0].position = [0.5, 0.5]
+        p.accessPoints[0].isLocked = true
+        try await store.save(p)
+        let model = FloorplanViewModel(store: store)
+        await model.open(id: p.id)
+        model.runOptimizer(satellites: .exactly(0), lockRouter: false)
+        try await waitUntil { if case .running = model.optimizer { return false }; return true }
+        guard case .ready(let comparison) = model.optimizer else {
+            Issue.record("Expected optimizer proposal")
+            await model.close()
+            return
+        }
+        #expect(comparison.proposal.routerPosition != SIMD2<Float>(0.5, 0.5))
+        model.applyOptimizerResult()
+        #expect(model.project?.router?.position == comparison.proposal.routerPosition)
+        #expect(model.project?.router?.isLocked == false)
+        await model.close()
+    }
+
+    @Test func routerOptimizationPreservesCrossFloorWirelessSatelliteReachability() throws {
+        let room0 = RoomInfo(name: "Long hall", kind: .hallway, polygon: [[0, 0], [60, 0], [60, 4], [0, 4]], floor: 0)
+        let room1 = RoomInfo(name: "Upstairs", kind: .bedroom, polygon: [[0, 0], [4, 0], [4, 4], [0, 4]], floor: 1)
+        let router = RFAccessPoint(name: "Router", position: [2, 2], floor: 0)
+        let upstairsWireless = RFAccessPoint(name: "Upstairs sat", position: [2, 2], isSatellite: true, floor: 1, backhaul: .wireless)
+        let proposal = try #require(PlacementOptimizer.optimize(PlacementRequest(
+            walls: [],
+            rooms: [room0, room1],
+            accessPoints: [router, upstairsWireless],
+            profile: NetworkProfile(),
+            width: 60,
+            depth: 4,
+            floor: 0,
+            satellites: .exactly(0),
+            lockRouter: false
+        )))
+        let backhaulModel = PropagationModel(walls: [], band: .five)
+        let rssi = router.txPower - backhaulModel.pathLoss(from: proposal.routerPosition, floorA: 0, to: upstairsWireless.position, floorB: 1)
+        #expect(rssi >= PlacementOptimizer.minimumBackhaulRSSI)
+    }
+
+    @Test func wiredTargetFloorSatelliteIsPlacedBeforeWirelessPeer() throws {
+        let router = RFAccessPoint(name: "Router", position: [1, 2], floor: 0)
+        let wireless = RFAccessPoint(name: "Wireless", position: [102, 2], isSatellite: true, floor: 1, backhaul: .wireless)
+        let wired = RFAccessPoint(name: "Wired", position: [101, 2], isSatellite: true, floor: 1, backhaul: .wired)
+        let room = RoomInfo(name: "Remote upstairs", kind: .bedroom, polygon: [[100, 0], [108, 0], [108, 4], [100, 4]], floor: 1)
+        let proposal = try #require(PlacementOptimizer.optimize(PlacementRequest(
+            walls: [],
+            rooms: [room],
+            accessPoints: [router, wireless, wired],
+            profile: NetworkProfile(),
+            width: 108,
+            depth: 4,
+            floor: 1,
+            satellites: .exactly(2),
+            lockRouter: true
+        )))
+        #expect(proposal.satellitePositions.count == 2)
+    }
+
+    @Test @MainActor func metadataEditsKeepBackhaulAndAvoidUndoSpam() async throws {
+        let (store, root) = try store()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var p = project()
+        let sat = RFAccessPoint(name: "Sat", position: [3, 3], isSatellite: true)
+        p.accessPoints.append(sat)
+        try await store.save(p)
+        let model = FloorplanViewModel(store: store)
+        await model.open(id: p.id)
+        try await waitUntil { model.backhaul[sat.id] != nil && !model.isComputing }
+
+        model.updateRoom(id: p.rooms[0].id, name: "   ")
+        #expect(!model.canUndo)
+        #expect(model.project?.rooms[0].name == "Room")
+
+        model.updateRoom(id: p.rooms[0].id, name: "Office")
+        #expect(model.canUndo)
+        #expect(!model.isComputing)
+        #expect(model.backhaul[sat.id] != nil)
+        #expect(model.roomCoverage.first?.name == "Office")
+
+        model.updateAccessPoint(id: sat.id) { $0.name = "" }
+        #expect(model.accessPoint(id: sat.id)?.name == "Sat")
+
+        model.updateAccessPoint(id: sat.id) { $0.name = "Hallway Sat" }
+        #expect(!model.isComputing)
+        #expect(model.backhaul[sat.id] != nil)
+
+        model.updateProfile { $0.internetPlanMbps = 500 }
+        #expect(!model.isComputing)
+        #expect(model.backhaul[sat.id] != nil)
+        #expect(model.probe?.internetMbps != nil)
+        await model.close()
+    }
+
+    @Test @MainActor func openingExistingProjectFileInPlacePreservesIDAndWorldMap() async throws {
+        let (store, root) = try store()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let p = project()
+        try await store.save(p)
+        try await store.saveWorldMap(Data([1, 2, 3]), for: p.id)
+        let inPlaceURL = await store.fileURL(for: p.id)
+        let model = FloorplanViewModel(store: store)
+        await model.importProject(from: inPlaceURL)
+        #expect(model.project?.id == p.id)
+        #expect(model.hasWorldMap)
+        #expect(await store.list().count == 1)
+        await model.close()
+    }
+
+    @Test @MainActor func switchingFloorsUpdatesProbeFloorAndValidatesMovedAPPosition() async throws {
+        let (store, root) = try store()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var p = project()
+        p.width = 10
+        p.depth = 10
+        p.floorCount = 2
+        let upstairsRoom = RoomInfo(name: "Loft", kind: .bedroom, polygon: [[6, 6], [10, 6], [10, 10], [6, 10]], floor: 1)
+        p.rooms.append(upstairsRoom)
+        let sat = RFAccessPoint(name: "Sat", position: [1, 1], isSatellite: true, floor: 0)
+        p.accessPoints.append(sat)
+        try await store.save(p)
+
+        let model = FloorplanViewModel(store: store)
+        await model.open(id: p.id)
+        try await waitUntil { model.heatmapImage != nil }
+        model.setFloor(1)
+        #expect(model.project?.probeFloor == 1)
+        #expect(model.probe?.floor == 1)
+        #expect(upstairsRoom.contains(try #require(model.project?.probe)))
+
+        model.updateAccessPoint(id: sat.id) { $0.floor = 1 }
+        let moved = try #require(model.accessPoint(id: sat.id))
+        #expect(moved.floor == 1)
+        #expect(upstairsRoom.contains(moved.position))
+        await model.close()
+    }
+
+    @Test func loadPreservesTimestampOnUpgradeAndSurvivesReadOnlyPrimary() async throws {
+        let (store, root) = try store()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var p = project()
+        let past = Date(timeIntervalSince1970: 1_700_000_000)
+        p.updatedAt = past
+        p.schemaVersion = 1
+        let primary = await store.fileURL(for: p.id)
+        try ProjectStore.encoder().encode(p).write(to: primary)
+        let upgraded = try await store.load(id: p.id)
+        #expect(abs(upgraded.updatedAt.timeIntervalSince(past)) < 1)
+        let reloaded = try await store.load(id: p.id)
+        #expect(abs(reloaded.updatedAt.timeIntervalSince(past)) < 1)
+    }
 }
