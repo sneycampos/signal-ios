@@ -12,7 +12,7 @@
 
 - **Name (≤30):** Wi-Fi Mesh Planner: LiDAR Scan
 - **Subtitle (≤30):** Wi-Fi heatmap & router planner
-- **Keywords (≤100):** wifi,heatmap,mesh,router,coverage,lidar,signal,dead zone,3d scan,satellite,floor plan,network
+- **Keywords (≤100):** wifi,heatmap,mesh,router,coverage,lidar,dead zone,3d scan,satellite,floor plan,network
 - **Promotional text (≤170):** Scan your home with LiDAR, place your router and mesh satellites, and see where Wi-Fi will reach before you buy or move anything.
 - **Description:**
 
@@ -34,7 +34,7 @@ Requires an iPhone or iPad with a LiDAR scanner for room scanning.
 
 - **Nome:** Wi-Fi Mesh Planner: LiDAR Scan
 - **Subtítulo:** Mapa de Wi-Fi e router
-- **Palavras-chave:** wifi,mapa,calor,mesh,router,cobertura,lidar,sinal,satélite,planta,rede,zona morta
+- **Palavras-chave:** wifi,mapa,calor,mesh,router,cobertura,lidar,satélite,planta,rede,zona morta
 - **Texto promocional:** Digitalize a sua casa com LiDAR, posicione o router e os satélites mesh e veja onde chega o Wi-Fi antes de comprar ou mudar seja o que for.
 - **Descrição:**
 
