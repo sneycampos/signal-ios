@@ -88,6 +88,12 @@ public enum PlacementOptimizer {
         var points: [SIMD2<Float>] = []
         var weights: [Float] = []
         var candidateIndices: [Int] = []
+        let existingSatellites = request.accessPoints
+            .filter { $0.isSatellite && $0.floor == floor && $0.isActive }
+            .sorted { ($0.backhaul == .wired ? 0 : 1) < ($1.backhaul == .wired ? 0 : 1) }
+        func isInsideHome(_ p: SIMD2<Float>) -> Bool {
+            rooms.isEmpty ? (p.x >= 0 && p.y >= 0 && p.x <= request.width && p.y <= request.depth) : rooms.contains { $0.contains(p) }
+        }
         func append(_ p: SIMD2<Float>, weight: Float) {
             guard points.count < maxPoints, !obstacles.contains(where: { Geometry.contains($0, p) }) else { return }
             weights.append(weight)
@@ -149,9 +155,6 @@ public enum PlacementOptimizer {
         }
 
         let routerTx = router.txPower + request.calibration.offsetDb
-        let existingSatellites = request.accessPoints
-            .filter { $0.isSatellite && $0.floor == floor }
-            .sorted { ($0.backhaul == .wired ? 0 : 1) < ($1.backhaul == .wired ? 0 : 1) }
         let fixedAPs = request.accessPoints.filter { $0.isSatellite && $0.floor != floor && $0.isActive }
         let fixedRows = fixedAPs.map { ap in points.map { model.rssi(from: ap, to: $0, floor: floor) } }
         func satelliteTx(_ i: Int) -> Float { (i < existingSatellites.count ? existingSatellites[i].txPower : 20.0) + request.calibration.offsetDb }
@@ -234,23 +237,20 @@ public enum PlacementOptimizer {
         // 3. Router position.
         let routerMovable = !request.lockRouter && router.floor == floor
         var routerPosition = router.position
-        var routerRow: [Float]
-        if !routerMovable {
-            routerRow = directRow(at: routerPosition, tx: routerTx, sourceFloor: router.floor)
-        } else {
+        var routerRow = directRow(at: routerPosition, tx: routerTx, sourceFloor: router.floor)
+        if routerMovable {
+            let currentConnected = requiredFixedIDs.isEmpty || isConnected(router: routerPosition, satellites: [])
             var bestC = -1
-            var bestScore: Float = -1
+            var bestScore: Float = currentConnected ? score(combine([routerRow])) : -1
             for c in 0..<candidateCount {
                 let position = points[candidateIndices[c]]
                 if !requiredFixedIDs.isEmpty && !isConnected(router: position, satellites: []) { continue }
-                let s = score(row(candidate: c, tx: routerTx))
+                let s = score(combine([row(candidate: c, tx: routerTx)]))
                 if s > bestScore { bestScore = s; bestC = c }
             }
             if bestC >= 0 {
                 routerPosition = points[candidateIndices[bestC]]
                 routerRow = row(candidate: bestC, tx: routerTx)
-            } else {
-                routerRow = directRow(at: routerPosition, tx: routerTx, sourceFloor: router.floor)
             }
         }
         if token?.isCancelled == true { return nil }
@@ -290,6 +290,27 @@ public enum PlacementOptimizer {
                     router: &routerPosition, routerRow: &routerRow, routerMovable: routerMovable,
                     satellites: &satellites, satelliteRows: &satelliteRows
                 )
+                if k + 1 == existingSatellites.count {
+                    var existingRouter = router.position
+                    var existingSats = existingSatellites.map(\.position)
+                    let routerInside = router.floor != floor || isInsideHome(existingRouter)
+                    if routerInside && existingSats.allSatisfy(isInsideHome) && isConnected(router: existingRouter, satellites: existingSats) {
+                        var existingRouterRow = directRow(at: existingRouter, tx: routerTx, sourceFloor: router.floor)
+                        var existingSatRows = existingSats.enumerated().map { directRow(at: $0.element, tx: satelliteTx($0.offset)) }
+                        refine(
+                            router: &existingRouter, routerRow: &existingRouterRow, routerMovable: routerMovable,
+                            satellites: &existingSats, satelliteRows: &existingSatRows
+                        )
+                        let existingBest = combine([existingRouterRow] + existingSatRows)
+                        let greedyBest = combine([routerRow] + satelliteRows)
+                        if score(existingBest) > score(greedyBest) && coverage(existingBest) >= coverage(greedyBest) {
+                            routerPosition = existingRouter
+                            routerRow = existingRouterRow
+                            satellites = existingSats
+                            satelliteRows = existingSatRows
+                        }
+                    }
+                }
                 let best = combine([routerRow] + satelliteRows)
                 configurations.append((routerPosition, satellites, coverage(best), score(best)))
                 progress?(0.45 + 0.5 * Double(k + 1) / Double(maxCount))
@@ -303,9 +324,11 @@ public enum PlacementOptimizer {
                     if node == 0 && !routerMovable { continue }
                     let others: [[Float]] = node == 0 ? satelliteRows : [routerRow] + satelliteRows.enumerated().filter { $0.offset != node - 1 }.map(\.element)
                     let base = combine(others)
+                    let currentRow = node == 0 ? routerRow : satelliteRows[node - 1]
+                    let currentConnected = (satellites.isEmpty && requiredFixedIDs.isEmpty) || isConnected(router: router, satellites: satellites)
                     let tx = node == 0 ? routerTx : satelliteTx(node - 1)
                     var bestC = -1
-                    var bestScore: Float = -1
+                    var bestScore: Float = currentConnected ? score(combine([base, currentRow])) : -1
                     for c in 0..<candidateCount {
                         let position = points[candidateIndices[c]]
                         var testRouter = router
@@ -358,7 +381,9 @@ public enum PlacementOptimizer {
             let tx = node == 0 ? routerTx : satelliteTx(node - 1)
             var bestPosition = nodes[node]
             var bestRow = rows[node]
-            var bestScore = score(combine([base, bestRow]))
+            let initialCombined = combine([base, bestRow])
+            var bestScore = score(initialCombined)
+            var bestCov = coverage(initialCombined)
             for i in -3...3 {
                 for j in -3...3 where i != 0 || j != 0 {
                     let p = nodes[node] + SIMD2<Float>(Float(i), Float(j)) * 0.1
@@ -368,8 +393,10 @@ public enum PlacementOptimizer {
                     test[node] = p
                     if (test.count > 1 || !requiredFixedIDs.isEmpty) && !isConnected(router: test[0], satellites: Array(test.dropFirst())) { continue }
                     let candidateRow = directRow(at: p, tx: tx)
-                    let s = score(combine([base, candidateRow]))
-                    if s > bestScore { bestScore = s; bestPosition = p; bestRow = candidateRow }
+                    let combined = combine([base, candidateRow])
+                    let s = score(combined)
+                    let cov = coverage(combined)
+                    if s > bestScore && cov >= bestCov { bestScore = s; bestCov = cov; bestPosition = p; bestRow = candidateRow }
                 }
             }
             nodes[node] = bestPosition
@@ -377,6 +404,7 @@ public enum PlacementOptimizer {
         }
         chosen.router = nodes[0]
         chosen.satellites = Array(nodes.dropFirst())
+        configurations[chosenCount].coverage = coverage(combine(rows))
         progress?(1)
 
         return PlacementProposal(

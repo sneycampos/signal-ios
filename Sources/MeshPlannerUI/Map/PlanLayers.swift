@@ -33,7 +33,7 @@ struct PlanSnapshot {
         if case .wall(let id) = model.selection { selectedWallId = id } else { selectedWallId = nil }
         self.showFurniture = model.showFurniture
         self.showRays = model.showRays
-        if case .ready(let comparison) = model.optimizer { proposal = comparison.proposal } else { proposal = nil }
+        if case .ready(let comparison) = model.optimizer, !comparison.isAlreadyOptimal { proposal = comparison.proposal } else { proposal = nil }
         self.drawNodes = drawNodes
         self.drawGrid = drawGrid
     }
