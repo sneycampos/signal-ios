@@ -84,12 +84,12 @@ struct ProjectStoreTests {
          "probePosition":[1,1],"roomPolygon":[[0,0],[5,0],[5,4],[0,4]],"rawObjects":[],"selectedBand":"5","revealSlider":0.85,"reflectionsEnabled":true}
         """
         try Data(legacy.utf8).write(to: root.appendingPathComponent("current_scan.json"))
-        let migrated = try #require(await store.migrateLegacyScanIfNeeded())
+        let migrated = try #require(try await store.migrateLegacyScanIfNeeded())
         #expect(migrated.name == "Cômodo antigo")
         #expect(migrated.rooms.count == 1)
         #expect(migrated.walls.first?.material == RFMaterial.glass, "old Low-E default on windows becomes clear glass")
         #expect(migrated.schemaVersion == FloorplanProject.currentSchemaVersion)
-        #expect(await store.migrateLegacyScanIfNeeded() == nil)
+        #expect(try await store.migrateLegacyScanIfNeeded() == nil)
         #expect(await store.list().count == 1)
     }
 
