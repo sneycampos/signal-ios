@@ -12,6 +12,8 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     DEVELOPMENT_TEAM: "677L8TYNN9"
     CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "1.1.0"
+    CURRENT_PROJECT_VERSION: "3"
 
 targets:
   SignalCore:
@@ -24,6 +26,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "com.silviogodinho.SignalCore"
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleShortVersionString: "$(MARKETING_VERSION)"
 
   SignalUI:
     type: framework
@@ -37,6 +40,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "com.silviogodinho.SignalUI"
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleShortVersionString: "$(MARKETING_VERSION)"
 
   Signal:
     type: application
@@ -86,8 +90,6 @@ targets:
       base:
         PRODUCT_NAME: "Signal"
         PRODUCT_BUNDLE_IDENTIFIER: "com.silviogodinho.signal"
-        MARKETING_VERSION: "1.1.0"
-        CURRENT_PROJECT_VERSION: "2"
         ASSETCATALOG_COMPILER_APPICON_NAME: "AppIcon"
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: NO
