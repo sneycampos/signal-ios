@@ -205,8 +205,6 @@ final class ARWalkSession {
         if isNormal {
             placeHeatmap()
             if placed { status = .ready }
-        } else if case .failed = status {
-            return
         } else {
             reading = nil
             status = .relocalizing

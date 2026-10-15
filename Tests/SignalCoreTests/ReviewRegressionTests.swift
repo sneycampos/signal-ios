@@ -566,6 +566,14 @@ extension ReviewRegressionTests {
         #expect(model.project?.id == p.id)
         #expect(model.hasWorldMap)
         #expect(await store.list().count == 1)
+
+        let renamedCopyURL = await store.projectsDirectory.appendingPathComponent("Exported Copy.signalsim")
+        try FileManager.default.copyItem(at: inPlaceURL, to: renamedCopyURL)
+        await model.importProject(from: renamedCopyURL)
+        #expect(model.project != nil)
+        #expect(model.project?.id != p.id)
+        #expect(model.errorMessage == nil)
+        #expect(await store.list().count == 2)
         await model.close()
     }
 

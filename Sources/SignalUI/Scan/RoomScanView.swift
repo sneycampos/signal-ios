@@ -15,7 +15,7 @@ struct RoomScanView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let isBusy = controller.phase != .scanning || creating
+            let isBusy = controller.phase == .processingRoom || controller.phase == .finishing || creating
             ZStack {
                 CaptureViewRepresentable(captureView: controller.captureView)
                     .ignoresSafeArea()
@@ -46,6 +46,9 @@ struct RoomScanView: View {
             if phase == .background, !creating {
                 controller.interrupted()
             }
+        }
+        .onChange(of: controller.phase) { _, phase in
+            if phase != .scanning { confirmCancel = false }
         }
         .onAppear {
             controller.onComplete = { capture, worldMap in
@@ -84,7 +87,10 @@ struct RoomScanView: View {
         } message: {
             Text(controller.roomWarning ?? "")
         }
-        .alert("Couldn't finish", isPresented: Binding(get: { if case .failed = controller.phase { return true } else { return false } }, set: { _ in })) {
+        .alert("Couldn't finish", isPresented: Binding(get: {
+            guard !confirmCancel, controller.roomWarning == nil else { return false }
+            if case .failed = controller.phase { return true } else { return false }
+        }, set: { _ in })) {
             if controller.roomsCaptured > 0 {
                 Button("Save \(controller.roomsCaptured == 1 ? "1 room" : "\(controller.roomsCaptured) rooms")") {
                     controller.completeWithCapturedRooms()

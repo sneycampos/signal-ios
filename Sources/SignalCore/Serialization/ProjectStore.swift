@@ -197,7 +197,7 @@ public actor ProjectStore {
         let projectsDir = projectsDirectory.standardizedFileURL.resolvingSymlinksInPath()
         guard dir == projectsDir, url.pathExtension.lowercased() == Self.fileExtension else { return nil }
         let id = url.deletingPathExtension().lastPathComponent
-        guard Self.safeID(id), FileManager.default.fileExists(atPath: fileURL(for: id).path) else { return nil }
+        guard Self.safeID(id), (try? load(id: id)) != nil else { return nil }
         return id
     }
 

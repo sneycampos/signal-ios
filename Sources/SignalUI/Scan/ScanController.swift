@@ -173,6 +173,8 @@ final class ScanController {
         guard !cancelled, captureView.captureSession.delegate != nil else { return }
         if case .failed = phase { return }
         if let error {
+            roomWarning = nil
+            canCompleteFromWarning = false
             phase = .failed(roomsCaptured > 0
                 ? "Scanning stopped: \(error). You can save the rooms already captured or close and try again."
                 : "Scanning stopped: \(error). Close this scan and try again.")
@@ -180,6 +182,8 @@ final class ScanController {
             return
         }
         guard phase == .processingRoom || phase == .finishing else {
+            roomWarning = nil
+            canCompleteFromWarning = false
             phase = .failed(roomsCaptured > 0
                 ? "Scanning was interrupted. You can save the rooms already captured or close and try again."
                 : "Scanning was interrupted. Close this scan and try again.")
@@ -207,11 +211,13 @@ final class ScanController {
             if finishing && (!roomBuildFailed || !hadWallsInCurrentRoom) {
                 await complete()
             } else {
+                let wasFinishing = finishing
+                finishing = false
                 roomNumber = rooms.count + 1
                 counts = Counts()
                 phase = .scanning
                 if roomBuildFailed {
-                    canCompleteFromWarning = finishing && !rooms.isEmpty
+                    canCompleteFromWarning = wasFinishing && !rooms.isEmpty
                     roomWarning = canCompleteFromWarning
                         ? "Couldn't process Room \(roomNumber). You can scan this room again or save the rooms already captured."
                         : "Couldn't process Room \(roomNumber). Scan this room again with good light, moving the device slowly."

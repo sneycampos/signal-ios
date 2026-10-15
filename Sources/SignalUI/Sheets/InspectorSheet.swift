@@ -17,9 +17,9 @@ struct InspectorSheet: View {
                         case .wall(let id):
                             if let wall = model.wall(id: id) { WallEditor(wall: wall) }
                         case .accessPoint(let id):
-                            if let ap = model.accessPoint(id: id) { AccessPointEditor(ap: ap) }
+                            if let ap = model.accessPoint(id: id) { AccessPointEditor(ap: ap).id(ap.id) }
                         case .room(let id):
-                            if let room = model.room(id: id) { RoomDetail(room: room) }
+                            if let room = model.room(id: id) { RoomDetail(room: room).id(room.id) }
                         case nil:
                             EmptyView()
                         }
@@ -272,11 +272,13 @@ private struct AccessPointEditor: View {
     @Environment(FloorplanViewModel.self) private var model
     let ap: RFAccessPoint
     @State private var name = ""
+    @FocusState private var nameFocused: Bool
     @State private var confirmRemoval = false
 
     var body: some View {
         Section {
             TextField("Name", text: $name)
+                .focused($nameFocused)
                 .onSubmit { commitName(for: ap.id) }
             Stepper(value: Binding(get: { Int(ap.txPower) }, set: { value in model.updateAccessPoint(id: ap.id) { $0.txPower = Float(value) } }), in: 10...30) {
                 LabeledContent("Power", value: Format.dbm(ap.txPower))
@@ -302,9 +304,8 @@ private struct AccessPointEditor: View {
             }
         }
         .onAppear { name = ap.name }
-        .onChange(of: ap.id) { oldId, _ in
-            commitName(for: oldId)
-            name = ap.name
+        .onChange(of: nameFocused) { _, focused in
+            if !focused { commitName(for: ap.id) }
         }
         .onChange(of: ap.name) { _, newValue in
             name = newValue
@@ -358,11 +359,13 @@ private struct RoomDetail: View {
     @Environment(FloorplanViewModel.self) private var model
     let room: RoomInfo
     @State private var name = ""
+    @FocusState private var nameFocused: Bool
 
     var body: some View {
         let coverage = model.roomCoverage.first { $0.id == room.id }
         Section {
             TextField("Name", text: $name)
+                .focused($nameFocused)
                 .onSubmit { commitName(for: room.id) }
             Picker("Type", selection: Binding(get: { room.kind }, set: { model.updateRoom(id: room.id, kind: $0) })) {
                 ForEach(RoomKind.allCases) { kind in
@@ -374,9 +377,8 @@ private struct RoomDetail: View {
             Text("The type sets how much this room matters when finding the best placement.")
         }
         .onAppear { name = room.name }
-        .onChange(of: room.id) { oldId, _ in
-            commitName(for: oldId)
-            name = room.name
+        .onChange(of: nameFocused) { _, focused in
+            if !focused { commitName(for: room.id) }
         }
         .onChange(of: room.name) { _, newValue in
             name = newValue
