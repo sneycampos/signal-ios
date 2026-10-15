@@ -53,6 +53,7 @@
 		B58E6534C088565EF21F8AD2 /* ProjectStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB88DD748BBE7853171F756E /* ProjectStore.swift */; };
 		B796F41D068FF6F67D9EC76F /* EquipmentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60E5D7AD8478A12AAF2096F7 /* EquipmentSheet.swift */; };
 		B9B0D3A4244FD3F9B0100E7C /* Geometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDB45BD287EDA8ECAAED0775 /* Geometry.swift */; };
+		C42FA2BEB1F26955683629D4 /* RoomLabelLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C25E6363F1E5D5FE375D3DC /* RoomLabelLayout.swift */; };
 		C4A471C0082514562A2B28E6 /* ProjectValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E6EC2A44DAE8E80E87F20EE /* ProjectValidation.swift */; };
 		CBC7C55BF3D464D3F631764A /* InspectorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58AA65134839EB1D3CE4BCCC /* InspectorSheet.swift */; };
 		DC0ACD63E6FB4E50B369543E /* SignalUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2FEE0EF2E2E8B16589E1A621 /* SignalUI.framework */; };
@@ -111,6 +112,7 @@
 		1010D21FE082A2EEBD09102F /* ProjectsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsHomeView.swift; sourceTree = "<group>"; };
 		12033740D337E52CEF7E7F8F /* NetworkProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkProfile.swift; sourceTree = "<group>"; };
 		16852E8393A19947CF3D1281 /* SupportSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportSheets.swift; sourceTree = "<group>"; };
+		1C25E6363F1E5D5FE375D3DC /* RoomLabelLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomLabelLayout.swift; sourceTree = "<group>"; };
 		1DB8CA4C7927EFCDC8AB7981 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1DBD82AC5976960D2CC39651 /* RFMaterial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RFMaterial.swift; sourceTree = "<group>"; };
 		1EF9708638BEFED7A2383F8D /* FloorplanProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloorplanProject.swift; sourceTree = "<group>"; };
@@ -201,6 +203,7 @@
 			isa = PBXGroup;
 			children = (
 				DDB45BD287EDA8ECAAED0775 /* Geometry.swift */,
+				1C25E6363F1E5D5FE375D3DC /* RoomLabelLayout.swift */,
 				DAF3A7DBE7203BCC04C89C70 /* RoomRegionDetector.swift */,
 			);
 			path = Geometry;
@@ -573,6 +576,7 @@
 				23095D033916E246F9AB7E8A /* RFPropagationEngine.swift in Sources */,
 				AD0E872DEFFB7F79745F9424 /* RFWallSegment.swift in Sources */,
 				A89B605769025D605E7C960C /* RoomInfo.swift in Sources */,
+				C42FA2BEB1F26955683629D4 /* RoomLabelLayout.swift in Sources */,
 				8AC49E630FB2B455A1614F14 /* RoomPlanConverter.swift in Sources */,
 				688DE88692581368190F8580 /* RoomRegionDetector.swift in Sources */,
 				FBEE6924EF9EE99137E42D81 /* SignalDataExporter.swift in Sources */,
