@@ -58,8 +58,8 @@ xcodebuild -version
 ## Quick start
 
 ```bash
-git clone https://github.com/sneycampos/signal-ios.git
-cd signal-ios
+git clone https://github.com/sneycampos/wifi-mesh-planner.git
+cd wifi-mesh-planner
 ./scripts/bootstrap.sh          # checks Xcode 26+, installs XcodeGen, generates the Xcode project
 ./scripts/test.sh               # unit tests on macOS
 ./scripts/build.sh --run --demo # builds, boots a simulator and opens the demo apartment
