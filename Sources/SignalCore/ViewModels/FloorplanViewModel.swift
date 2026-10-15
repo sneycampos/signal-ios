@@ -203,6 +203,36 @@ public final class FloorplanViewModel {
         await present(DefaultApartmentFixture.makeProject())
     }
 
+    #if DEBUG
+    public func prepareUITestDemo() async {
+        let base = DefaultApartmentFixture.makeProject()
+        var rooms = base.rooms
+        rooms.append(
+            RoomInfo(
+                id: "room_upstairs",
+                name: "Upstairs bedroom",
+                kind: .bedroom,
+                polygon: [SIMD2(0, 0), SIMD2(7, 0), SIMD2(7, 6), SIMD2(0, 6)],
+                floor: 1
+            )
+        )
+        let saved = FloorplanProject(
+            id: "uitest-saved",
+            name: "Saved apartment",
+            width: base.width,
+            depth: base.depth,
+            walls: base.walls,
+            accessPoints: base.accessPoints,
+            rooms: rooms,
+            probe: base.probe,
+            floorCount: 2
+        )
+        try? await store.save(saved)
+        await start()
+        await openDemo()
+    }
+    #endif
+
     @discardableResult
     private func present(_ newProject: FloorplanProject, hasWorldMap: Bool = false) async -> Bool {
         guard await flushSave(), !Task.isCancelled else { return false }

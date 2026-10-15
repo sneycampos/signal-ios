@@ -9,6 +9,7 @@ struct RoomScanView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var controller = ScanController()
     @State private var confirmCancel = false
+    @State private var showFailureAlert = false
     @State private var creating = false
     @State private var creationTask: Task<Void, Never>?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -17,8 +18,12 @@ struct RoomScanView: View {
         GeometryReader { geometry in
             let isBusy = controller.phase == .processingRoom || controller.phase == .finishing || creating
             ZStack {
-                CaptureViewRepresentable(captureView: controller.captureView)
-                    .ignoresSafeArea()
+                if let captureView = controller.captureView {
+                    CaptureViewRepresentable(captureView: captureView)
+                        .ignoresSafeArea()
+                } else {
+                    Color.black.ignoresSafeArea()
+                }
 
                 VStack(spacing: 12) {
                     topBar
@@ -49,7 +54,24 @@ struct RoomScanView: View {
         }
         .onChange(of: controller.phase) { _, phase in
             if phase != .scanning { confirmCancel = false }
+            if case .failed = phase {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(150))
+                    if case .failed = controller.phase, !confirmCancel, controller.roomWarning == nil {
+                        showFailureAlert = true
+                    }
+                }
+            } else {
+                showFailureAlert = false
+            }
         }
+        #if DEBUG
+        .onChange(of: confirmCancel) { _, isConfirming in
+            if isConfirming, ScanController.isFakeScanFailureEnabled {
+                controller.scheduleFakeFailure()
+            }
+        }
+        #endif
         .onAppear {
             controller.onComplete = { capture, worldMap in
                 creating = true
@@ -87,10 +109,7 @@ struct RoomScanView: View {
         } message: {
             Text(controller.roomWarning ?? "")
         }
-        .alert("Couldn't finish", isPresented: Binding(get: {
-            guard !confirmCancel, controller.roomWarning == nil else { return false }
-            if case .failed = controller.phase { return true } else { return false }
-        }, set: { _ in })) {
+        .alert("Couldn't finish", isPresented: $showFailureAlert) {
             if controller.roomsCaptured > 0 {
                 Button("Save \(controller.roomsCaptured == 1 ? "1 room" : "\(controller.roomsCaptured) rooms")") {
                     controller.completeWithCapturedRooms()
@@ -113,7 +132,12 @@ struct RoomScanView: View {
     private var topBar: some View {
         HStack {
             Button {
-                if controller.hasCapturedAnything { confirmCancel = true } else { controller.cancel(); dismiss() }
+                if controller.phase == .scanning, controller.hasCapturedAnything {
+                    confirmCancel = true
+                } else {
+                    controller.cancel()
+                    dismiss()
+                }
             } label: {
                 Label("Cancel", systemImage: "xmark")
                     .labelStyle(.iconOnly)
@@ -122,6 +146,7 @@ struct RoomScanView: View {
             .buttonStyle(.bordered)
             .clipShape(Circle())
             .accessibilityLabel("Cancel scan")
+            .accessibilityIdentifier("scanCancel")
 
             Spacer()
 
@@ -172,6 +197,7 @@ struct RoomScanView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(controller.counts.walls == 0)
+                .accessibilityIdentifier("scanNextRoom")
 
                 Button {
                     controller.finish()
@@ -181,6 +207,7 @@ struct RoomScanView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(controller.counts.walls == 0 && controller.roomsCaptured == 0)
+                .accessibilityIdentifier("scanDone")
             }
             .controlSize(.large)
         }

@@ -101,3 +101,31 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_IDENTITY: "Apple Development"
         ENABLE_PREVIEWS: NO
+
+  SignalUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Tests/SignalUITests
+    dependencies:
+      - target: Signal
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: "com.silviogodinho.SignalUITests"
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Signal
+
+schemes:
+  Signal:
+    build:
+      targets:
+        Signal: all
+  SignalUITests:
+    build:
+      targets:
+        Signal: [test, run]
+        SignalUITests: [test]
+    test:
+      targets:
+        - SignalUITests

@@ -141,6 +141,7 @@ struct MapScreen: View {
     private func header(_ project: FloorplanProject) -> some View {
         HStack(spacing: 12) {
             CircleIconButton(systemImage: "chevron.left", label: "Back to projects") { Task { await model.close() } }
+                .accessibilityIdentifier("backToProjects")
             Spacer(minLength: 0)
             VStack(spacing: 1) {
                 Text(project.name)
@@ -249,8 +250,10 @@ struct MapScreen: View {
             }
             .opacity(viewport.isDefault ? 0.6 : 1)
             layersMenu(project)
+                .accessibilityIdentifier("mapLayers")
             if model.canUndo {
                 CircleIconButton(systemImage: "arrow.uturn.backward", label: "Undo") { model.undo() }
+                    .accessibilityIdentifier("undo")
                     .transition(.scale.combined(with: .opacity))
             }
         }
@@ -356,12 +359,14 @@ struct BandPicker: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(band == selection ? .isSelected : [])
+                .accessibilityIdentifier("band-\(band.rawValue)")
             }
         }
         .padding(4)
         .glassSurface(Capsule())
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Wi-Fi band")
+        .accessibilityIdentifier("bandToggle")
     }
 }
 
@@ -385,10 +390,12 @@ struct SummaryCard: View {
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.7))
                 Spacer(minLength: 4)
-                if model.isComputing {
-                    ProgressView().controlSize(.small)
-                } else {
+                ZStack {
                     CoverageVerdict(percent: model.coverage.coveredPercent)
+                        .opacity(model.isComputing ? 0 : 1)
+                    if model.isComputing {
+                        ProgressView().controlSize(.small)
+                    }
                 }
             }
             .accessibilityElement(children: .combine)

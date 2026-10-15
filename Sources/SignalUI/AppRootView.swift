@@ -19,6 +19,12 @@ public struct AppRootView: View {
         }
         .preferredColorScheme(.dark)
         .task {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-uitest-demo") {
+                await model.prepareUITestDemo()
+                return
+            }
+            #endif
             await model.start()
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-openDemo") { await model.openDemo() }

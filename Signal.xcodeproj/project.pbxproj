@@ -56,6 +56,7 @@
 		C42FA2BEB1F26955683629D4 /* RoomLabelLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C25E6363F1E5D5FE375D3DC /* RoomLabelLayout.swift */; };
 		C4A471C0082514562A2B28E6 /* ProjectValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E6EC2A44DAE8E80E87F20EE /* ProjectValidation.swift */; };
 		CBC7C55BF3D464D3F631764A /* InspectorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58AA65134839EB1D3CE4BCCC /* InspectorSheet.swift */; };
+		D5A673CE86CDFD75B7E1A892 /* SignalUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEFCC0AE644C56D836D32ABD /* SignalUITests.swift */; };
 		DC0ACD63E6FB4E50B369543E /* SignalUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2FEE0EF2E2E8B16589E1A621 /* SignalUI.framework */; };
 		E6C4081E0EA363335F13F751 /* ReportRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F7E2124F4734352658B2870 /* ReportRenderer.swift */; };
 		F407CA38DAEB95B71268BA97 /* ExportFilename.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD7583E2C59DF2C42E06480E /* ExportFilename.swift */; };
@@ -80,6 +81,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 3D4F2162D3D57646BF89A4BB;
 			remoteInfo = SignalUI;
+		};
+		E985F855472C095F1F5C8A9D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5DCA908C16957564AA8C2B1A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AC6A4C5D9DE6F0E0B4A0E04E;
+			remoteInfo = Signal;
 		};
 		F69BEC22D5FE827B83526469 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -136,6 +144,7 @@
 		6EEE915E503BFACF5DA0AD5C /* RFWallSegment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RFWallSegment.swift; sourceTree = "<group>"; };
 		713BB96342102AC4F2E592BC /* MapScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapScreen.swift; sourceTree = "<group>"; };
 		7BF5FD75DBF8E973550FB117 /* LinkRateModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkRateModel.swift; sourceTree = "<group>"; };
+		7CD0CCFEDB8A83D029489AC7 /* SignalUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SignalUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7E6EC2A44DAE8E80E87F20EE /* ProjectValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectValidation.swift; sourceTree = "<group>"; };
 		8A23BA35BBEF17FACD965853 /* SupportLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportLinks.swift; sourceTree = "<group>"; };
 		8B7E0D8C2B69FFB93AC7B4D2 /* PlanLayers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanLayers.swift; sourceTree = "<group>"; };
@@ -154,6 +163,7 @@
 		DA7C5095666671806890490E /* SignalCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SignalCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		DAF3A7DBE7203BCC04C89C70 /* RoomRegionDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomRegionDetector.swift; sourceTree = "<group>"; };
 		DDB45BD287EDA8ECAAED0775 /* Geometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Geometry.swift; sourceTree = "<group>"; };
+		DEFCC0AE644C56D836D32ABD /* SignalUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalUITests.swift; sourceTree = "<group>"; };
 		E0BFFD5D36F38DB86279CE0A /* FloorplanCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloorplanCanvas.swift; sourceTree = "<group>"; };
 		EB88DD748BBE7853171F756E /* ProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStore.swift; sourceTree = "<group>"; };
 		EE47935148E4DA467DE52CB1 /* SignalStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalStyle.swift; sourceTree = "<group>"; };
@@ -219,6 +229,14 @@
 				07DC83229A8945C6FE35E52B /* SignalDebugLogger.swift */,
 			);
 			path = Serialization;
+			sourceTree = "<group>";
+		};
+		3089E34346F2C15B958915C0 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				B0D77C4789B46CAC21BD5B6A /* SignalUITests */,
+			);
+			path = Tests;
 			sourceTree = "<group>";
 		};
 		32DE76D5CA711032D2D8A191 /* Engine */ = {
@@ -342,6 +360,14 @@
 			path = Style;
 			sourceTree = "<group>";
 		};
+		B0D77C4789B46CAC21BD5B6A /* SignalUITests */ = {
+			isa = PBXGroup;
+			children = (
+				DEFCC0AE644C56D836D32ABD /* SignalUITests.swift */,
+			);
+			path = SignalUITests;
+			sourceTree = "<group>";
+		};
 		B67EA4B4C9AB56F1D7E7F523 /* Report */ = {
 			isa = PBXGroup;
 			children = (
@@ -376,6 +402,7 @@
 				9D5999FF8532367E6DBD5F60 /* Signal.app */,
 				DA7C5095666671806890490E /* SignalCore.framework */,
 				2FEE0EF2E2E8B16589E1A621 /* SignalUI.framework */,
+				7CD0CCFEDB8A83D029489AC7 /* SignalUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -385,6 +412,7 @@
 			children = (
 				5BD15943D9237DA780B7EA8B /* Resources */,
 				CFF67A4F47D628270AC0083F /* Sources */,
+				3089E34346F2C15B958915C0 /* Tests */,
 				D2A9230E27E9F4AC1910E6A2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -459,6 +487,24 @@
 			productReference = DA7C5095666671806890490E /* SignalCore.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		F20D73D44CBD812CEE16CF35 /* SignalUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BE36D0F0385936F06C6EC71F /* Build configuration list for PBXNativeTarget "SignalUITests" */;
+			buildPhases = (
+				795334F00C4FE27F3DC55896 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D8D8CD065A42894704C2A4ED /* PBXTargetDependency */,
+			);
+			name = SignalUITests;
+			packageProductDependencies = (
+			);
+			productName = SignalUITests;
+			productReference = 7CD0CCFEDB8A83D029489AC7 /* SignalUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -480,6 +526,11 @@
 						DevelopmentTeam = 677L8TYNN9;
 						ProvisioningStyle = Automatic;
 					};
+					F20D73D44CBD812CEE16CF35 = {
+						DevelopmentTeam = 677L8TYNN9;
+						ProvisioningStyle = Automatic;
+						TestTargetID = AC6A4C5D9DE6F0E0B4A0E04E;
+					};
 				};
 			};
 			buildConfigurationList = 4294BC7AC0BF0C21034A213E /* Build configuration list for PBXProject "Signal" */;
@@ -499,6 +550,7 @@
 				D79109CFE81582A9748CCF5E /* SignalCore */,
 				3D4F2162D3D57646BF89A4BB /* SignalUI */,
 				AC6A4C5D9DE6F0E0B4A0E04E /* Signal */,
+				F20D73D44CBD812CEE16CF35 /* SignalUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -586,6 +638,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		795334F00C4FE27F3DC55896 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D5A673CE86CDFD75B7E1A892 /* SignalUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CCA9DD53B157AF4FD18F1326 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -611,6 +671,11 @@
 			isa = PBXTargetDependency;
 			target = D79109CFE81582A9748CCF5E /* SignalCore */;
 			targetProxy = 39D8DBFF6EF474099D719B3B /* PBXContainerItemProxy */;
+		};
+		D8D8CD065A42894704C2A4ED /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AC6A4C5D9DE6F0E0B4A0E04E /* Signal */;
+			targetProxy = E985F855472C095F1F5C8A9D /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -693,6 +758,24 @@
 			};
 			name = Release;
 		};
+		24A125B32750527036CA12B3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.silviogodinho.SignalUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Signal;
+			};
+			name = Debug;
+		};
 		2B3EDD5DC6EAA9B93F8C8376 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -738,6 +821,24 @@
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
+		};
+		76B53D4A3047E1EF63DCF877 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.silviogodinho.SignalUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Signal;
+			};
+			name = Release;
 		};
 		88E2E85CDDDA799F6B0B07E8 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -914,6 +1015,15 @@
 			buildConfigurations = (
 				4BA2909272F1D3A443AB393B /* Debug */,
 				1E234E276DCE6BF2A0DDAD74 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BE36D0F0385936F06C6EC71F /* Build configuration list for PBXNativeTarget "SignalUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				24A125B32750527036CA12B3 /* Debug */,
+				76B53D4A3047E1EF63DCF877 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
