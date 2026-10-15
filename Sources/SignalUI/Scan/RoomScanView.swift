@@ -9,6 +9,7 @@ struct RoomScanView: View {
     @State private var controller = ScanController()
     @State private var confirmCancel = false
     @State private var creating = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         ZStack {
@@ -18,7 +19,9 @@ struct RoomScanView: View {
             VStack(spacing: 12) {
                 topBar
                 Spacer()
-                bottomPanel
+                ScrollView { bottomPanel }
+                    .frame(maxHeight: 380)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal)
 
@@ -27,6 +30,7 @@ struct RoomScanView: View {
             }
         }
         .statusBarHidden(false)
+        .onDisappear { controller.cancel() }
         .onAppear {
             controller.onComplete = { capture, worldMap in
                 creating = true
@@ -86,7 +90,7 @@ struct RoomScanView: View {
 
     private var bottomPanel: some View {
         VStack(spacing: 12) {
-            HStack(spacing: 16) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4), spacing: 12) {
                 CountLabel(value: controller.counts.walls, title: "Walls", icon: "square.split.2x1")
                 CountLabel(value: controller.counts.doors, title: "Doors", icon: "door.left.hand.open")
                 CountLabel(value: controller.counts.windows, title: "Windows", icon: "window.vertical.closed")
@@ -110,7 +114,7 @@ struct RoomScanView: View {
             .tint(controller.routerMarked ? .green : .accentColor)
             .sensoryFeedback(.success, trigger: controller.routerMarked)
 
-            HStack(spacing: 12) {
+            (dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))) {
                 Button {
                     controller.nextRoom()
                 } label: {

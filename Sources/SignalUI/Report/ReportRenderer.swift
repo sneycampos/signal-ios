@@ -7,13 +7,20 @@ enum ReportRenderer {
 
     @MainActor
     static func render(model: FloorplanViewModel, project: FloorplanProject) -> URL? {
-        let view = ReportPage(snapshot: PlanSnapshot(model: model, project: project, drawNodes: true), model: model, project: project)
+        guard !model.isComputing, model.field != nil, model.project == project else { return nil }
+        var snapshot = PlanSnapshot(model: model, project: project, drawNodes: true, drawGrid: false)
+        snapshot.printPalette = true
+        snapshot.probe = nil
+        snapshot.showRays = false
+        snapshot.proposal = nil
+        let view = ReportPage(snapshot: snapshot, model: model, project: project)
             .frame(width: pageSize.width, height: pageSize.height)
             .environment(\.colorScheme, .light)
         let renderer = ImageRenderer(content: view)
         renderer.proposedSize = ProposedViewSize(pageSize)
-        let safeName = project.name.components(separatedBy: CharacterSet(charactersIn: "/\\:?%*|\"<>")).joined(separator: "-")
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("Wi-Fi report - \(safeName)").appendingPathExtension("pdf")
+        let safeName = ExportFilename.sanitized(project.name)
+        guard let directory = try? ExportFilename.directory() else { return nil }
+        let url = directory.appendingPathComponent("Wi-Fi report - \(safeName)").appendingPathExtension("pdf")
         var ok = false
         renderer.render { size, draw in
             var box = CGRect(origin: .zero, size: size)
@@ -51,7 +58,7 @@ private struct ReportPage: View {
             .frame(height: 330)
             .background(Color(white: 0.96), in: RoundedRectangle(cornerRadius: 8))
 
-            SignalLegend(scale: model.scale)
+            SignalLegend(scale: model.scale, printPalette: true)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("By room (\(model.band.displayName))").font(.headline)
@@ -64,6 +71,9 @@ private struct ReportPage: View {
                         Text(Format.dbm(room.summary.medianRSSI)).monospacedDigit().foregroundStyle(.secondary).frame(width: 70, alignment: .trailing)
                     }
                     .font(.caption)
+                }
+                if model.roomCoverage.count > 12 {
+                    Text("Showing 12 of \(model.roomCoverage.count) rooms. See the app for all room results.").font(.caption)
                 }
             }
 
@@ -80,8 +90,9 @@ private struct ReportPage: View {
     private var summaryBlock: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Summary").font(.headline)
-            Text("\(Format.percent(model.coverage.coveredPercent)) of your home has good signal").font(.subheadline.bold())
-            Text("Area: \(Format.area(project.areaM2)) · \(project.rooms.count) rooms").font(.caption)
+            Text("Selected floor: \(model.floor == 0 ? "Ground floor" : "Floor \(model.floor)") · \(model.band.displayName)").font(.caption.bold())
+            Text("\(Format.percent(model.coverage.coveredPercent)) of this floor has good signal").font(.subheadline.bold())
+            Text("Area: \(Format.area(project.rooms(onFloor: model.floor).reduce(0) { $0 + $1.area })) · \(project.rooms(onFloor: model.floor).count) rooms").font(.caption)
             Text("Typical signal: \(Format.dbm(model.coverage.medianRSSI))").font(.caption)
             if project.calibration.isCalibrated {
                 Text("Calibrated with \(project.calibration.sampleCount) measurement(s)").font(.caption)
@@ -110,7 +121,7 @@ private struct ReportPage: View {
             if weak.isEmpty {
                 Text("Every room has good signal. Keep the router elevated and away from metal and aquariums.").font(.caption)
             } else {
-                Text("Weak signal in: \(weak.map(\.name).formatted(.list(type: .and))). Use “Optimize” in the app to try another router position or a mesh satellite.").font(.caption)
+                Text("Weak signal in: \(weak.prefix(3).map(\.name).formatted(.list(type: .and)))\(weak.count > 3 ? " and \(weak.count - 3) more rooms" : ""). Use “Optimize” in the app to try another router position or a mesh satellite.").font(.caption)
             }
             let weakBackhaul = model.backhaul.values.filter { $0.quality == .weak }
             if !weakBackhaul.isEmpty {

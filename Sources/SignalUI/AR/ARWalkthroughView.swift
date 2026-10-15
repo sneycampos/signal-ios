@@ -127,8 +127,10 @@ final class ARWalkSession {
     @ObservationIgnored private var backhaul: [String: BackhaulLink] = [:]
     @ObservationIgnored private var placed = false
     @ObservationIgnored private var lastUpdate: TimeInterval = 0
+    @ObservationIgnored private var stopped = false
 
     func start(project: FloorplanProject, alignment: WorldAlignment, floor: Int, heatmap: CGImage?, worldMap: Data?) async {
+        guard !Task.isCancelled, !stopped else { return }
         guard ARWorldTrackingConfiguration.isSupported else {
             status = .failed("This device does not support augmented reality.")
             return
@@ -160,17 +162,23 @@ final class ARWalkSession {
     }
 
     func stop() {
+        stopped = true
+        reading = nil
+        arView.session.delegate = nil
         arView.session.pause()
+        arView.scene.anchors.removeAll()
     }
 
     fileprivate func trackingChanged(isNormal: Bool) {
-        guard status != .ready || !placed else { return }
+        guard !stopped else { return }
+        if case .failed = status { return }
         if isNormal {
             placeHeatmap()
             status = .ready
         } else if case .failed = status {
             return
         } else {
+            reading = nil
             status = .relocalizing
         }
     }
@@ -205,7 +213,8 @@ final class ARWalkSession {
                 material.blending = .transparent(opacity: .init(floatLiteral: 0.7))
                 let entity = ModelEntity(mesh: mesh, materials: [material])
                 let origin = alignment.worldPoint(fromPlan: .zero)
-                entity.position = SIMD3(origin.x, alignment.floorY + 0.02, origin.y)
+                guard !stopped, !Task.isCancelled else { return }
+                entity.position = SIMD3(origin.x, alignment.elevation(for: floor, floorHeight: project.profile.floorHeight) + 0.02, origin.y)
                 entity.orientation = simd_quatf(angle: alignment.rotation, axis: SIMD3(0, 1, 0))
                 let anchor = AnchorEntity(world: .zero)
                 anchor.addChild(entity)
@@ -214,6 +223,13 @@ final class ARWalkSession {
                 status = .failed("Couldn't draw the map on the floor.")
             }
         }
+    }
+
+    fileprivate func failed(_ message: String) {
+        guard !stopped else { return }
+        reading = nil
+        status = .failed("\(message) Close AR and reopen it to retry, or scan again.")
+        arView.session.pause()
     }
 }
 
@@ -227,6 +243,19 @@ private final class ARWalkDelegate: NSObject, ARSessionDelegate, @unchecked Send
     }
 
     private var lastForwarded: TimeInterval = 0
+
+    func sessionWasInterrupted(_ session: ARSession) {
+        Task { @MainActor [weak self] in self?.session?.trackingChanged(isNormal: false) }
+    }
+
+    func sessionInterruptionEnded(_ session: ARSession) {
+        Task { @MainActor [weak self] in self?.session?.trackingChanged(isNormal: false) }
+    }
+
+    func session(_ session: ARSession, didFailWithError error: any Error) {
+        let message = error.localizedDescription
+        Task { @MainActor [weak self] in self?.session?.failed(message) }
+    }
 
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         let time = frame.timestamp

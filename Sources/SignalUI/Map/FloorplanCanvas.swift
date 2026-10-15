@@ -124,7 +124,7 @@ struct FloorplanCanvas: View {
     /// Largest rooms first; a label that would collide with another label, a node or the probe shows only its percentage.
     private func layoutLabels(_ transform: PlanTransform) -> [LabelLayout] {
         let rooms = project.rooms(onFloor: model.floor)
-        let areas = Dictionary(uniqueKeysWithValues: rooms.map { ($0.id, $0.area) })
+        let areas = Dictionary(rooms.map { ($0.id, $0.area) }, uniquingKeysWith: { first, _ in first })
         let labels = model.roomCoverage
             .filter { areas[$0.id] != nil && $0.summary.cellCount > 0 }
             .sorted { (areas[$0.id] ?? 0) > (areas[$1.id] ?? 0) }
@@ -138,17 +138,20 @@ struct FloorplanCanvas: View {
         }
         return labels.compactMap { label in
             let anchor = transform.point(label.labelPoint)
-            let width = max(CGFloat(label.name.count) * 6.5, 36) + 8
+            let nameSize = (label.name as NSString).size(withAttributes: [.font: UIFont.preferredFont(forTextStyle: .caption1)])
+            let percentSize = (Format.percent(label.summary.coveredPercent) as NSString).size(withAttributes: [.font: UIFont.preferredFont(forTextStyle: .caption2)])
+            let width = max(nameSize.width, percentSize.width) + 12
+            let height = nameSize.height + percentSize.height + 8
             let candidates = [anchor, CGPoint(x: anchor.x, y: anchor.y + 36), CGPoint(x: anchor.x, y: anchor.y - 36)]
             for center in candidates {
-                let full = CGRect(x: center.x - width / 2, y: center.y - 16, width: width, height: 32)
+                let full = CGRect(x: center.x - width / 2, y: center.y - height / 2, width: width, height: height)
                 if !occupied.contains(where: { $0.intersects(full) }) {
                     occupied.append(full)
                     return LabelLayout(coverage: label, center: center, compact: false)
                 }
             }
             for center in candidates {
-                let small = CGRect(x: center.x - 18, y: center.y - 8, width: 36, height: 16)
+                let small = CGRect(x: center.x - (percentSize.width + 8) / 2, y: center.y - (percentSize.height + 4) / 2, width: percentSize.width + 8, height: percentSize.height + 4)
                 if !occupied.contains(where: { $0.intersects(small) }) {
                     occupied.append(small)
                     return LabelLayout(coverage: label, center: center, compact: true)

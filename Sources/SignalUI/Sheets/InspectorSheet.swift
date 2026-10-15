@@ -276,12 +276,16 @@ private struct AccessPointEditor: View {
 
     var body: some View {
         Section {
-            TextField("Name", text: $name)
-                .onSubmit { model.updateAccessPoint(id: ap.id) { $0.name = name } }
-                .onAppear { name = ap.name }
-                .onChange(of: ap.id) { name = ap.name }
+            TextField("Name", text: Binding(get: { ap.name }, set: { value in model.updateAccessPoint(id: ap.id) { $0.name = value } }))
             Stepper(value: Binding(get: { Int(ap.txPower) }, set: { value in model.updateAccessPoint(id: ap.id) { $0.txPower = Float(value) } }), in: 10...30) {
                 LabeledContent("Power", value: Format.dbm(ap.txPower))
+            }
+            if let project = model.project {
+                Picker("Floor", selection: Binding(get: { ap.floor }, set: { value in model.updateAccessPoint(id: ap.id) { $0.floor = value } })) {
+                    ForEach(0..<project.floorCount, id: \.self) { Text("Floor \($0)").tag($0) }
+                }
+                Stepper("Horizontal position: \(Format.meters(ap.position.x))", value: Binding(get: { Double(ap.position.x) }, set: { model.moveAccessPoint(id: ap.id, to: SIMD2(Float($0), ap.position.y)) }), in: 0...Double(project.width), step: 0.25)
+                Stepper("Vertical position: \(Format.meters(ap.position.y))", value: Binding(get: { Double(ap.position.y) }, set: { model.moveAccessPoint(id: ap.id, to: SIMD2(ap.position.x, Float($0))) }), in: 0...Double(project.depth), step: 0.25)
             }
             if !ap.isSatellite {
                 Toggle(isOn: Binding(get: { ap.isLocked }, set: { value in model.updateAccessPoint(id: ap.id) { $0.isLocked = value } })) {
@@ -335,10 +339,7 @@ private struct RoomDetail: View {
     var body: some View {
         let coverage = model.roomCoverage.first { $0.id == room.id }
         Section {
-            TextField("Name", text: $name)
-                .onSubmit { model.updateRoom(id: room.id, name: name) }
-                .onAppear { name = room.name }
-                .onChange(of: room.id) { name = room.name }
+            TextField("Name", text: Binding(get: { room.name }, set: { model.updateRoom(id: room.id, name: $0) }))
             Picker("Type", selection: Binding(get: { room.kind }, set: { model.updateRoom(id: room.id, kind: $0) })) {
                 ForEach(RoomKind.allCases) { kind in
                     Text(kind.baseName).tag(kind)

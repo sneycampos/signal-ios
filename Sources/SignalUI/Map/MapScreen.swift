@@ -31,6 +31,7 @@ struct MapScreen: View {
 
     @ViewBuilder
     private func content(_ project: FloorplanProject) -> some View {
+        GeometryReader { geometry in
         ZStack {
             switch model.viewMode {
             case .plan:
@@ -56,7 +57,8 @@ struct MapScreen: View {
                 .padding(.top, topChrome + 12)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
 
-            SummaryCard(onAddSatellite: {
+            ScrollView {
+                SummaryCard(onAddSatellite: {
                 model.addSatellite()
                 showInspector = true
             }, onOptimize: {
@@ -64,11 +66,15 @@ struct MapScreen: View {
             }, onSelectRoom: { id in
                 model.selection = .room(id)
                 showInspector = true
-            })
+                })
+            }
+            .frame(maxHeight: geometry.size.height * 0.48)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 12)
             .padding(.bottom, 4)
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { cardTop = $0 }
             .frame(maxHeight: .infinity, alignment: .bottom)
+        }
         }
         .background(Theme.canvas)
         .toolbar(.hidden, for: .navigationBar)
@@ -78,7 +84,7 @@ struct MapScreen: View {
         .onChange(of: showCalibration) { if showCalibration { sheetDetent = .medium } }
         .onChange(of: model.optimizer) { _, state in
             // Lower the sheet so the proposed positions are visible on the map.
-            if case .ready = state, showOptimizer { withAnimation { sheetDetent = .fraction(0.3) } }
+            if case .ready = state, showOptimizer { withAnimation(reduceMotion ? nil : .default) { sheetDetent = .fraction(0.3) } }
         }
         .sheet(isPresented: $showInspector) {
             InspectorSheet()
@@ -123,7 +129,7 @@ struct MapScreen: View {
 
     private func header(_ project: FloorplanProject) -> some View {
         HStack(spacing: 12) {
-            CircleIconButton(systemImage: "chevron.left", label: "Back to projects") { model.close() }
+            CircleIconButton(systemImage: "chevron.left", label: "Back to projects") { Task { await model.close() } }
             Spacer(minLength: 0)
             VStack(spacing: 1) {
                 Text(project.name)
@@ -157,6 +163,23 @@ struct MapScreen: View {
             Section {
                 Button { showEquipment = true } label: { Label("Equipment and preferences", systemImage: "wifi.router") }
                 Button { model.tool = .placeRouter } label: { Label("Place the router", systemImage: "hand.tap") }
+                Menu("Place router in a room") {
+                    ForEach(project.rooms(onFloor: model.floor)) { room in
+                        Button(room.name) {
+                            model.tool = .placeRouter
+                            model.handleTap(at: room.labelPoint, wallTolerance: 0)
+                            if let router = model.project?.router { model.selection = .accessPoint(router.id); showInspector = true }
+                        }
+                    }
+                }
+                Menu("Edit walls and objects") {
+                    ForEach(project.walls.filter { $0.floor == model.floor }) { wall in
+                        Button("\(wall.name) · \(wall.material.name)") {
+                            model.selection = .wall(wall.id)
+                            showInspector = true
+                        }
+                    }
+                }
                 Button { showCalibration = true } label: { Label("Calibrate with measurements", systemImage: "scope") }
                 Button { showAR = true } label: { Label("View in augmented reality", systemImage: "arkit") }
                     .disabled(!model.hasWorldMap || project.worldAlignment == nil)
@@ -170,6 +193,7 @@ struct MapScreen: View {
                 } label: {
                     Label("PDF report", systemImage: "doc.richtext")
                 }
+                .disabled(model.isComputing || model.field == nil)
                 if !project.isDemo {
                     Button {
                         renameText = project.name
@@ -189,6 +213,7 @@ struct MapScreen: View {
             } label: {
                 Label("Advanced", systemImage: "gearshape.2")
             }
+            SupportLinks()
         } label: {
             Image(systemName: "ellipsis")
                 .font(.system(size: 17, weight: .semibold))
@@ -293,6 +318,7 @@ struct MapScreen: View {
 // MARK: - Band picker
 
 struct BandPicker: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let bands: [RFBand]
     let selection: RFBand
     var onSelect: (RFBand) -> Void
@@ -302,7 +328,7 @@ struct BandPicker: View {
         HStack(spacing: 4) {
             ForEach(bands) { band in
                 Button {
-                    withAnimation(.snappy) { onSelect(band) }
+                    withAnimation(reduceMotion ? nil : .snappy) { onSelect(band) }
                 } label: {
                     Text(band.displayName)
                         .font(.subheadline.weight(.semibold))
@@ -332,6 +358,7 @@ struct BandPicker: View {
 
 struct SummaryCard: View {
     @Environment(FloorplanViewModel.self) private var model
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var onAddSatellite: () -> Void
     var onOptimize: () -> Void
     var onSelectRoom: (String) -> Void
@@ -381,7 +408,7 @@ struct SummaryCard: View {
                 .scrollClipDisabled()
             }
 
-            HStack(spacing: 10) {
+            (dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 10)) : AnyLayout(HStackLayout(spacing: 10))) {
                 Button(action: onAddSatellite) {
                     Label("Satellite", systemImage: "plus")
                         .font(.body.weight(.semibold))
