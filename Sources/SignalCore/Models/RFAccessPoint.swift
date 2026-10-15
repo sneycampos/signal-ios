@@ -50,15 +50,15 @@ extension RFAccessPoint: Codable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
-            id: (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString,
-            name: (try? c.decode(String.self, forKey: .name)) ?? "Router",
+            id: (try c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString,
+            name: (try c.decodeIfPresent(String.self, forKey: .name)) ?? "Router",
             position: try c.decode(SIMD2<Float>.self, forKey: .position),
-            txPower: (try? c.decode(Float.self, forKey: .txPower)) ?? 20,
-            isSatellite: (try? c.decode(Bool.self, forKey: .isSatellite)) ?? false,
-            isActive: (try? c.decode(Bool.self, forKey: .isActive)) ?? true,
-            floor: (try? c.decode(Int.self, forKey: .floor)) ?? 0,
-            backhaul: (try? c.decode(BackhaulType.self, forKey: .backhaul)) ?? .wireless,
-            isLocked: (try? c.decode(Bool.self, forKey: .isLocked)) ?? false
+            txPower: (try c.decodeIfPresent(Float.self, forKey: .txPower)) ?? 20,
+            isSatellite: (try c.decodeIfPresent(Bool.self, forKey: .isSatellite)) ?? false,
+            isActive: (try c.decodeIfPresent(Bool.self, forKey: .isActive)) ?? true,
+            floor: (try c.decodeIfPresent(Int.self, forKey: .floor)) ?? 0,
+            backhaul: (try c.decodeIfPresent(BackhaulType.self, forKey: .backhaul)) ?? .wireless,
+            isLocked: (try c.decodeIfPresent(Bool.self, forKey: .isLocked)) ?? false
         )
     }
 

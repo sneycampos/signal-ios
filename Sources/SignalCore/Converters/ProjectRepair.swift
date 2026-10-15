@@ -112,19 +112,15 @@ public enum ProjectRepair {
         let (lo, hi) = Geometry.bounds(polygon)
         var total = 0
         var covered = 0
-        let step: Float = 0.2
-        var x = lo.x + step / 2
-        while x < hi.x {
-            var z = lo.y + step / 2
-            while z < hi.y {
-                let p = SIMD2<Float>(x, z)
+        let grid = FieldGrid.covering(width: hi.x - lo.x, depth: hi.y - lo.y, targetCell: 0.2, maxCells: 2_500)
+        for row in 0..<grid.rows {
+            for col in 0..<grid.cols {
+                let p = lo + grid.center(col: col, row: row)
                 if Geometry.contains(polygon, p) {
                     total += 1
                     if rooms.contains(where: { $0.contains(p) }) { covered += 1 }
                 }
-                z += step
             }
-            x += step
         }
         return total == 0 ? 1 : Float(covered) / Float(total)
     }

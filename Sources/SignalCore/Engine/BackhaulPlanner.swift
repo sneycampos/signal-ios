@@ -29,7 +29,7 @@ public struct BackhaulLink: Equatable, Sendable {
 public enum BackhaulPlanner {
     public static let wiredThroughput: Float = 940
 
-    public static func plan(accessPoints: [RFAccessPoint], walls: [RFWallSegment], profile: NetworkProfile, calibration: Calibration = .uncalibrated) -> [String: BackhaulLink] {
+    public static func plan(accessPoints: [RFAccessPoint], walls: [RFWallSegment], profile: NetworkProfile, calibration: Calibration = .uncalibrated, token: CancellationToken? = nil) -> [String: BackhaulLink] {
         guard let router = accessPoints.first(where: { !$0.isSatellite && $0.isActive }) else { return [:] }
         let band = profile.effectiveBackhaulBand
         let model = PropagationModel(walls: walls, band: band, calibration: calibration, floorHeight: profile.floorHeight)
@@ -49,21 +49,22 @@ public enum BackhaulPlanner {
         }
 
         while !pending.isEmpty {
-            var best: (pendingIndex: Int, parent: Int, rssi: Float)?
+            guard token?.isCancelled != true else { return [:] }
+            var best: (pendingIndex: Int, parent: Int, rssi: Float, throughput: Float)?
             for (i, sat) in pending.enumerated() {
                 for (j, node) in connected.enumerated() {
                     let value = model.rssi(from: node.ap, to: sat.position, floor: sat.floor)
-                    if value > (best?.rssi ?? -.greatestFiniteMagnitude) {
-                        best = (i, j, value)
+                    let rate = LinkRateModel.estimate(rssi: value, band: band, profile: profile, streams: 2).throughputMbps
+                    let throughput = min(node.throughput, rate) * (profile.dedicatedBackhaulRadio ? 1 : 0.5)
+                    if throughput > (best?.throughput ?? -1) {
+                        best = (i, j, value, throughput)
                     }
                 }
             }
             guard let choice = best else { break }
             let sat = pending.remove(at: choice.pendingIndex)
             let parent = connected[choice.parent]
-            let link = LinkRateModel.estimate(rssi: choice.rssi, band: band, profile: profile, streams: 2).throughputMbps
-            let hopFactor: Float = profile.dedicatedBackhaulRadio ? 1 : 0.5
-            let throughput = min(parent.throughput, link) * hopFactor
+            let throughput = choice.throughput
             let hops = parent.hops + 1
             links[sat.id] = BackhaulLink(
                 satelliteId: sat.id,

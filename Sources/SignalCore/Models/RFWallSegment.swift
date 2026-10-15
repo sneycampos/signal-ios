@@ -93,21 +93,21 @@ extension RFWallSegment: Codable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let material = try c.decode(RFMaterial.self, forKey: .material)
-        let group = (try? c.decode(Int32.self, forKey: .groupId)) ?? (try? c.decode(Int32.self, forKey: .objId)) ?? 0
+        let group = try c.decodeIfPresent(Int32.self, forKey: .groupId) ?? c.decodeIfPresent(Int32.self, forKey: .objId) ?? 0
         self.init(
-            id: (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString,
-            name: (try? c.decode(String.self, forKey: .name)) ?? "Wall",
+            id: (try c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString,
+            name: (try c.decodeIfPresent(String.self, forKey: .name)) ?? "Wall",
             p1: try c.decode(SIMD2<Float>.self, forKey: .p1),
             p2: try c.decode(SIMD2<Float>.self, forKey: .p2),
             material: material,
-            thickness: (try? c.decode(Float.self, forKey: .thickness)) ?? material.defaultThickness,
-            height: (try? c.decode(Float.self, forKey: .height)) ?? 2.7,
-            isActive: (try? c.decode(Bool.self, forKey: .isActive)) ?? true,
+            thickness: (try c.decodeIfPresent(Float.self, forKey: .thickness)) ?? material.defaultThickness,
+            height: (try c.decodeIfPresent(Float.self, forKey: .height)) ?? 2.7,
+            isActive: (try c.decodeIfPresent(Bool.self, forKey: .isActive)) ?? true,
             objId: group,
-            kind: try? c.decode(WallKind.self, forKey: .kind),
-            floor: (try? c.decode(Int.self, forKey: .floor)) ?? 0,
-            isExterior: (try? c.decode(Bool.self, forKey: .isExterior)) ?? false,
-            isMaterialAuto: (try? c.decode(Bool.self, forKey: .isMaterialAuto)) ?? true
+            kind: try c.decodeIfPresent(WallKind.self, forKey: .kind),
+            floor: (try c.decodeIfPresent(Int.self, forKey: .floor)) ?? 0,
+            isExterior: (try c.decodeIfPresent(Bool.self, forKey: .isExterior)) ?? false,
+            isMaterialAuto: (try c.decodeIfPresent(Bool.self, forKey: .isMaterialAuto)) ?? true
         )
     }
 

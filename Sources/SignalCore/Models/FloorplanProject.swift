@@ -8,11 +8,17 @@ public struct WorldAlignment: Codable, Equatable, Sendable {
     public var offset: SIMD2<Float>
     /// World-space height of the scanned floor, used to place the AR overlay.
     public var floorY: Float
+    public var floorElevations: [Float]?
 
     public init(rotation: Float, offset: SIMD2<Float>, floorY: Float) {
         self.rotation = rotation
         self.offset = offset
         self.floorY = floorY
+    }
+
+    public func elevation(for floor: Int, floorHeight: Float) -> Float {
+        if let floorElevations, floorElevations.indices.contains(floor) { return floorElevations[floor] }
+        return floorY + Float(floor) * floorHeight
     }
 
     public func planPoint(worldX: Float, worldZ: Float) -> SIMD2<Float> {
@@ -172,31 +178,34 @@ public struct FloorplanProject: Codable, Identifiable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let walls = try c.decode([RFWallSegment].self, forKey: .walls)
-        let width = (try? c.decode(Float.self, forKey: .width)) ?? 10
-        let depth = (try? c.decode(Float.self, forKey: .depth)) ?? 10
+        let width = (try c.decodeIfPresent(Float.self, forKey: .width)) ?? 10
+        let depth = (try c.decodeIfPresent(Float.self, forKey: .depth)) ?? 10
+        let decodedFloorCount = (try c.decodeIfPresent(Int.self, forKey: .floorCount)) ?? 1
+        guard (1...32).contains(decodedFloorCount) else { throw ProjectStoreError.unreadableFile }
         self.init(
-            id: (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString,
-            name: (try? c.decode(String.self, forKey: .name)) ?? "Project",
-            createdAt: (try? c.decode(Date.self, forKey: .createdAt)) ?? Date(),
-            updatedAt: (try? c.decode(Date.self, forKey: .updatedAt)) ?? Date(),
-            isDemo: (try? c.decode(Bool.self, forKey: .isDemo)) ?? false,
+            id: (try c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString,
+            name: (try c.decodeIfPresent(String.self, forKey: .name)) ?? "Project",
+            createdAt: (try c.decodeIfPresent(Date.self, forKey: .createdAt)) ?? Date(),
+            updatedAt: (try c.decodeIfPresent(Date.self, forKey: .updatedAt)) ?? Date(),
+            isDemo: (try c.decodeIfPresent(Bool.self, forKey: .isDemo)) ?? false,
             width: width,
             depth: depth,
             walls: walls,
-            accessPoints: (try? c.decode([RFAccessPoint].self, forKey: .accessPoints)) ?? [],
-            rooms: (try? c.decode([RoomInfo].self, forKey: .rooms)) ?? [],
-            furniture: (try? c.decode([FurnitureItem].self, forKey: .furniture)) ?? [],
-            profile: (try? c.decode(NetworkProfile.self, forKey: .profile)) ?? NetworkProfile(),
-            calibration: (try? c.decode(Calibration.self, forKey: .calibration)) ?? .uncalibrated,
-            measurements: (try? c.decode([SignalMeasurement].self, forKey: .measurements)) ?? [],
-            probe: (try? c.decode(SIMD2<Float>.self, forKey: .probe)) ?? SIMD2<Float>(width * 0.5, depth * 0.5),
-            probeFloor: (try? c.decode(Int.self, forKey: .probeFloor)) ?? 0,
-            selectedBand: (try? c.decode(RFBand.self, forKey: .selectedBand)) ?? .five,
-            worldAlignment: try? c.decode(WorldAlignment.self, forKey: .worldAlignment),
-            floorCount: (try? c.decode(Int.self, forKey: .floorCount)) ?? 1
+            accessPoints: (try c.decodeIfPresent([RFAccessPoint].self, forKey: .accessPoints)) ?? [],
+            rooms: (try c.decodeIfPresent([RoomInfo].self, forKey: .rooms)) ?? [],
+            furniture: (try c.decodeIfPresent([FurnitureItem].self, forKey: .furniture)) ?? [],
+            profile: (try c.decodeIfPresent(NetworkProfile.self, forKey: .profile)) ?? NetworkProfile(),
+            calibration: (try c.decodeIfPresent(Calibration.self, forKey: .calibration)) ?? .uncalibrated,
+            measurements: (try c.decodeIfPresent([SignalMeasurement].self, forKey: .measurements)) ?? [],
+            probe: (try c.decodeIfPresent(SIMD2<Float>.self, forKey: .probe)) ?? SIMD2<Float>(width * 0.5, depth * 0.5),
+            probeFloor: (try c.decodeIfPresent(Int.self, forKey: .probeFloor)) ?? 0,
+            selectedBand: (try c.decodeIfPresent(RFBand.self, forKey: .selectedBand)) ?? .five,
+            worldAlignment: try c.decodeIfPresent(WorldAlignment.self, forKey: .worldAlignment),
+            floorCount: decodedFloorCount
         )
-        schemaVersion = (try? c.decode(Int.self, forKey: .schemaVersion)) ?? 1
+        schemaVersion = (try c.decodeIfPresent(Int.self, forKey: .schemaVersion)) ?? 1
         if !calibration.isCalibrated { calibration = .uncalibrated }
+        try validate()
     }
 }
 
@@ -224,7 +233,7 @@ struct LegacyScanState: Decodable {
     let rawObjects: [LegacyObject]?
     let selectedBand: RFBand?
 
-    func toProject() -> FloorplanProject {
+    func toProject() throws -> FloorplanProject {
         var polygons = roomPolygons ?? []
         if polygons.isEmpty, let single = roomPolygon, single.count >= 3 { polygons = [single] }
         let rooms = RoomNaming.assignNames(polygons.map { RoomInfo(name: "", kind: .other, polygon: $0) })
@@ -244,6 +253,7 @@ struct LegacyScanState: Decodable {
             selectedBand: selectedBand ?? .five
         )
         project.schemaVersion = 1
+        try project.validate()
         return ProjectRepair.upgradeIfNeeded(project)
     }
 }

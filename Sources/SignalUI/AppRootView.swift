@@ -12,7 +12,7 @@ public struct AppRootView: View {
     public var body: some View {
         NavigationStack {
             ProjectsHomeView(onScan: startScan, onImport: { showImporter = true })
-                .navigationDestination(isPresented: Binding(get: { model.isProjectOpen }, set: { if !$0 { model.close() } })) {
+                .navigationDestination(isPresented: Binding(get: { model.isProjectOpen }, set: { if !$0 { Task { await model.close() } } })) {
                     MapScreen()
                 }
         }
@@ -20,7 +20,7 @@ public struct AppRootView: View {
         .task {
             await model.start()
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-openDemo") { model.openDemo() }
+            if ProcessInfo.processInfo.arguments.contains("-openDemo") { await model.openDemo() }
             #endif
         }
         .fullScreenCover(isPresented: $showScan) {
@@ -35,6 +35,7 @@ public struct AppRootView: View {
             Task { await model.importProject(from: url) }
         }
         .alert("Something went wrong", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
+            Button("Retry saving") { Task { await model.flushSave() } }
             Button("OK", role: .cancel) {}
         } message: {
             Text(model.errorMessage ?? "")
@@ -43,11 +44,13 @@ public struct AppRootView: View {
 
     private func startScan() {
         Task {
+            guard ScanAvailability.current != .unsupportedDevice else { return }
             guard await ScanAvailability.requestCamera() else {
                 model.errorMessage = "Allow camera access in Settings to scan your home."
                 return
             }
-            if model.isProjectOpen { model.close() }
+            if model.isProjectOpen { await model.close() }
+            guard !model.isProjectOpen else { return }
             showScan = true
         }
     }

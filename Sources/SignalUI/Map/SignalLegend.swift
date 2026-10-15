@@ -4,6 +4,9 @@ import SignalCore
 /// Thin color ramp with ticks at their true dBm positions; the coverage threshold is bold.
 struct SignalLegend: View {
     let scale: SignalScale
+    var printPalette = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .caption2) private var tickHeight = 14
     private let low: Float = -95
     private let high: Float = -35
 
@@ -12,24 +15,33 @@ struct SignalLegend: View {
             LinearGradient(stops: gradientStops, startPoint: .leading, endPoint: .trailing)
                 .frame(height: 6)
                 .clipShape(Capsule())
-            GeometryReader { geo in
-                ForEach(ticks, id: \.self) { value in
-                    Text(Int(value).formatted())
-                        .font(.caption2.monospacedDigit())
-                        .fontWeight(value == scale.coverageThreshold ? .bold : .regular)
-                        .foregroundStyle(value == scale.coverageThreshold ? .white : .white.opacity(0.55))
-                        .fixedSize()
-                        .position(x: position(value) * geo.size.width, y: 7)
+            if dynamicTypeSize.isAccessibilitySize {
+                Text("Good signal: \(Format.dbm(scale.coverageThreshold)) or higher")
+                    .font(.caption)
+                    .foregroundStyle(printPalette ? .black : .white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                GeometryReader { geo in
+                    ForEach(ticks, id: \.self) { value in
+                        Text(Int(value).formatted())
+                            .font(.caption2.monospacedDigit())
+                            .fontWeight(value == scale.coverageThreshold ? .bold : .regular)
+                            .foregroundStyle((printPalette ? Color.black : Color.white).opacity(value == scale.coverageThreshold ? 1 : 0.7))
+                            .fixedSize()
+                            .position(x: position(value) * geo.size.width, y: tickHeight / 2)
+                    }
                 }
+                .frame(height: tickHeight)
             }
-            .frame(height: 14)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Map legend")
-        .accessibilityValue(Text("Green from \(Format.dbm(scale.coverageThreshold)): good signal. Yellow and orange: fair. Red: weak."))
+        .accessibilityValue(Text("Good signal from \(Format.dbm(scale.coverageThreshold)). Lower values indicate fair or weak signal."))
     }
 
-    private var ticks: [Float] { [-85, -75, scale.coverageThreshold, -55, -45].sorted() }
+    private var ticks: [Float] {
+        ([-85, -75, -55, -45].filter { abs($0 - scale.coverageThreshold) >= 7 } + [scale.coverageThreshold]).sorted()
+    }
 
     private func position(_ value: Float) -> CGFloat { CGFloat((value - low) / (high - low)) }
 

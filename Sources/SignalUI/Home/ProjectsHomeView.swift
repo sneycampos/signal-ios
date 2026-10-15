@@ -5,6 +5,7 @@ import SignalCore
 struct ProjectsHomeView: View {
     @Environment(FloorplanViewModel.self) private var model
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
     var onScan: () -> Void
     var onImport: () -> Void
 
@@ -33,7 +34,7 @@ struct ProjectsHomeView: View {
                 }
 
                 Button {
-                    model.openDemo()
+                    Task { await model.openDemo() }
                 } label: {
                     Label("Open demo apartment", systemImage: "building.2")
                         .font(.body.weight(.medium))
@@ -49,6 +50,7 @@ struct ProjectsHomeView: View {
                     .foregroundStyle(.white.opacity(0.45))
                     .frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
+                SupportLinks()
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 24)
@@ -64,6 +66,9 @@ struct ProjectsHomeView: View {
             }
         }
         .onAppear { availability = ScanAvailability.current }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { availability = ScanAvailability.current }
+        }
         .confirmationDialog(
             "Delete \(pendingDeletion?.name ?? "")?",
             isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),

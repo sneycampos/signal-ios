@@ -13,6 +13,7 @@ extension View {
     /// Frosted surface: Liquid Glass on iOS 26, material with a hairline on earlier versions.
     @ViewBuilder
     func glassSurface<S: Shape>(_ shape: S) -> some View {
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             self.glassEffect(.regular, in: shape)
         } else {
@@ -20,6 +21,11 @@ extension View {
                 .background(.ultraThinMaterial, in: shape)
                 .overlay(shape.stroke(Theme.hairline, lineWidth: 0.5))
         }
+        #else
+        self
+            .background(.ultraThinMaterial, in: shape)
+            .overlay(shape.stroke(Theme.hairline, lineWidth: 0.5))
+        #endif
     }
 
     func cardSurface(cornerRadius: CGFloat = 24) -> some View {

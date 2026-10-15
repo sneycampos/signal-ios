@@ -22,6 +22,8 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: Sources/SignalCore
+      - path: Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "com.silviogodinho.SignalCore"

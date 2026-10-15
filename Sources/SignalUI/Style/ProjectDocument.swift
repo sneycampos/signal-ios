@@ -26,7 +26,7 @@ struct WebFloorplanDocument: Transferable {
 
     static var transferRepresentation: some TransferRepresentation {
         FileRepresentation(exportedContentType: .json) { document in
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(document.name)-web").appendingPathExtension("json")
+            let url = try ExportFilename.directory().appendingPathComponent("\(ExportFilename.sanitized(document.name))-web").appendingPathExtension("json")
             try document.data.write(to: url, options: .atomic)
             return SentTransferredFile(url)
         }

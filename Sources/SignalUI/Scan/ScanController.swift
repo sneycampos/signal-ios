@@ -61,6 +61,8 @@ final class ScanController {
     @ObservationIgnored private var finishing = false
     @ObservationIgnored private var cancelled = false
     @ObservationIgnored private var worldMap: Data?
+    @ObservationIgnored private var processingTask: Task<Void, Never>?
+    @ObservationIgnored private var currentStory = 0
     @ObservationIgnored var onComplete: ((RoomPlanCapture, Data?) -> Void)?
 
     init() {
@@ -71,13 +73,14 @@ final class ScanController {
     }
 
     func start() {
+        guard !cancelled else { return }
         captureView.captureSession.run(configuration: RoomCaptureSession.Configuration())
     }
 
     func markRouter() {
         guard let transform = arSession.currentFrame?.camera.transform else { return }
         routerMarker = simd_float3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
-        routerStory = rooms.last?.story ?? 0
+        routerStory = currentStory
         routerMarked = true
     }
 
@@ -95,7 +98,7 @@ final class ScanController {
         arSession.getCurrentWorldMap { [weak self] map, _ in
             let data = map.flatMap { try? NSKeyedArchiver.archivedData(withRootObject: $0, requiringSecureCoding: true) }
             Task { @MainActor in
-                guard let self else { return }
+                guard let self, !self.cancelled, self.phase == .finishing else { return }
                 self.worldMap = data
                 self.captureView.captureSession.stop(pauseARSession: false)
             }
@@ -103,33 +106,65 @@ final class ScanController {
     }
 
     func cancel() {
+        guard !cancelled else { return }
         cancelled = true
+        processingTask?.cancel()
+        processingTask = nil
+        onComplete = nil
+        captureView.captureSession.delegate = nil
+        captureView.delegate = nil
         captureView.captureSession.stop(pauseARSession: true)
         arSession.pause()
+        rooms.removeAll()
+        worldMap = nil
     }
 
     var hasCapturedAnything: Bool { roomsCaptured > 0 || counts.walls > 0 }
 
+    func interrupted() {
+        guard !cancelled else { return }
+        processingTask?.cancel()
+        processingTask = nil
+        phase = .failed("Scanning was interrupted. Close this scan and try again.")
+        captureView.captureSession.stop(pauseARSession: true)
+        arSession.pause()
+    }
+
     // MARK: Delegate events
 
     fileprivate func didUpdate(_ room: CapturedRoom) {
+        guard !cancelled, phase == .scanning else { return }
+        currentStory = room.story
         counts = Counts(walls: room.walls.count, doors: room.doors.count + room.openings.count, windows: room.windows.count, objects: room.objects.count)
     }
 
-    fileprivate func didEnd(with data: CapturedRoomData, error: (any Error)?) {
+    fileprivate func didEnd(with data: CapturedRoomData, error: String?) {
         guard !cancelled else { return }
-        Task {
+        if let error {
+            phase = .failed("Scanning stopped: \(error). Close this scan and try again.")
+            arSession.pause()
+            return
+        }
+        guard phase == .processingRoom || phase == .finishing else {
+            phase = .failed("Scanning was interrupted. Close this scan and try again.")
+            arSession.pause()
+            return
+        }
+        processingTask = Task {
             do {
                 let room = try await RoomBuilder(options: [.beautifyObjects]).capturedRoom(from: data)
+                guard !Task.isCancelled, !cancelled else { return }
                 rooms.append(room)
                 roomsCaptured = rooms.count
             } catch {
+                guard !Task.isCancelled, !cancelled else { return }
                 if rooms.isEmpty && finishing {
                     phase = .failed("Couldn't build the plan. Try again with more light, moving the iPhone slowly.")
                     return
                 }
                 SignalDebugLogger.shared.log("Discarded room: \(error.localizedDescription)", category: "Scan")
             }
+            guard !Task.isCancelled, !cancelled else { return }
             if finishing {
                 await complete()
             } else {
@@ -146,8 +181,10 @@ final class ScanController {
         if rooms.count > 1 {
             do {
                 let structure = try await StructureBuilder(options: [.beautifyObjects]).capturedStructure(from: rooms)
+                guard !Task.isCancelled, !cancelled else { return }
                 capture = RoomPlanExtraction.capture(from: structure, routerMarker: routerMarker, routerStory: routerStory)
             } catch {
+                guard !Task.isCancelled, !cancelled else { return }
                 SignalDebugLogger.shared.log("Failed to merge rooms: \(error.localizedDescription)", category: "Scan")
                 capture = merged(rooms)
             }
@@ -157,8 +194,11 @@ final class ScanController {
             phase = .failed("No rooms were captured.")
             return
         }
+        guard !Task.isCancelled, !cancelled else { return }
         arSession.pause()
-        onComplete?(capture, worldMap)
+        let completion = onComplete
+        onComplete = nil
+        completion?(capture, worldMap)
     }
 
     /// Fallback when StructureBuilder fails: rooms already share world coordinates.
@@ -200,7 +240,7 @@ final class ScanDelegate: NSObject, RoomCaptureSessionDelegate, RoomCaptureViewD
         let message = error.map { String(describing: $0) }
         Task { @MainActor [weak self] in
             if let message { SignalDebugLogger.shared.log("Session ended with error: \(message)", category: "Scan") }
-            self?.controller?.didEnd(with: data, error: nil)
+            self?.controller?.didEnd(with: data, error: message)
         }
     }
 

@@ -56,7 +56,7 @@ struct CalibrationSheet: View {
                     }
 
                     Section {
-                        Button("Calibrate model") { result = model.runCalibration() }
+                        Button("Calibrate model") { Task { result = await model.runCalibration() } }
                         if let result {
                             LabeledContent("Average error before", value: Format.decibels(result.rmsBefore))
                             LabeledContent("Average error after", value: Format.decibels(result.rmsAfter))

@@ -36,7 +36,7 @@ struct EquipmentSheet: View {
                 }
                 if profile.supportedBands.contains(.six) {
                     Picker("Width on 6 GHz", selection: binding(\.channelWidth6)) {
-                        ForEach([80, 160, 320], id: \.self) { Text("\($0) MHz").tag($0) }
+                        ForEach(profile.validChannelWidths(for: .six), id: \.self) { Text("\($0) MHz").tag($0) }
                     }
                 }
             } header: {

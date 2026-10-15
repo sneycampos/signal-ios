@@ -4,6 +4,7 @@ import simd
 
 /// Everything needed to draw the plan once.
 struct PlanSnapshot {
+    var printPalette = false
     var project: FloorplanProject
     var floor: Int
     var heatmap: CGImage?
@@ -75,6 +76,7 @@ struct PlanPainter {
 
     private var project: FloorplanProject { snapshot.project }
     private var floor: Int { snapshot.floor }
+    private var ink: Color { snapshot.printPalette ? .black : .white }
 
     func draw(in context: inout GraphicsContext, size: CGSize) {
         if snapshot.drawGrid { drawDotGrid(&context, size: size) }
@@ -84,7 +86,7 @@ struct PlanPainter {
         for room in rooms { interior.addPath(transform.path(room.polygon)) }
         if rooms.isEmpty { interior = Path(roundedRect: planRect, cornerRadius: 6) }
 
-        context.fill(interior, with: .color(.white.opacity(0.05)))
+        context.fill(interior, with: .color(ink.opacity(0.05)))
         if let heatmap = snapshot.heatmap, snapshot.heatmapOpacity > 0.02 {
             context.drawLayer { layer in
                 layer.clip(to: interior)
@@ -126,7 +128,7 @@ struct PlanPainter {
             p.move(to: transform.point(SIMD2(s.x, s.y)))
             p.addLine(to: transform.point(SIMD2(s.z, s.w)))
         }
-        context.stroke(p, with: .color(.white.opacity(0.55)), style: StrokeStyle(lineWidth: 1.2, lineCap: .round, dash: [4, 4]))
+        context.stroke(p, with: .color(ink.opacity(0.55)), style: StrokeStyle(lineWidth: 1.2, lineCap: .round, dash: [4, 4]))
     }
 
     private func drawFurniture(_ context: inout GraphicsContext) {
@@ -136,8 +138,8 @@ struct PlanPainter {
                 item.position + Geometry.rotate($0, by: item.yaw)
             }
             let shape = transform.path(corners)
-            context.fill(shape, with: .color(.white.opacity(0.06)))
-            context.stroke(shape, with: .color(.white.opacity(0.25)), lineWidth: 0.8)
+            context.fill(shape, with: .color(ink.opacity(0.06)))
+            context.stroke(shape, with: .color(ink.opacity(0.4)), lineWidth: 0.8)
         }
     }
 
@@ -153,7 +155,7 @@ struct PlanPainter {
             }
             switch wall.kind {
             case .obstacle:
-                context.stroke(path, with: .color(.white.opacity(0.3)), style: StrokeStyle(lineWidth: 1, lineCap: .round))
+                context.stroke(path, with: .color(ink.opacity(0.6)), style: StrokeStyle(lineWidth: 1, lineCap: .round))
             case .opening:
                 break
             case .door:
@@ -164,7 +166,7 @@ struct PlanPainter {
                 // Thinner on thumbnails so walls do not hide the heatmap.
                 let zoomFactor = max(0.3, min(1, transform.scale / 20))
                 let base: CGFloat = (wall.isExterior ? 3.2 : 2.2) * zoomFactor
-                context.stroke(path, with: .color(Theme.wall), style: StrokeStyle(lineWidth: base, lineCap: .round))
+                context.stroke(path, with: .color(snapshot.printPalette ? .black : Theme.wall), style: StrokeStyle(lineWidth: base, lineCap: .round))
             }
         }
     }
@@ -177,7 +179,7 @@ struct PlanPainter {
             var line = Path()
             line.move(to: CGPoint(x: a.x + n.x * sign, y: a.y + n.y * sign))
             line.addLine(to: CGPoint(x: b.x + n.x * sign, y: b.y + n.y * sign))
-            context.stroke(line, with: .color(Theme.window), style: StrokeStyle(lineWidth: 1.2, lineCap: .butt))
+            context.stroke(line, with: .color(snapshot.printPalette ? .blue : Theme.window), style: StrokeStyle(lineWidth: 1.2, lineCap: .butt))
         }
     }
 
@@ -193,10 +195,10 @@ struct PlanPainter {
         var leaf = Path()
         leaf.move(to: a)
         leaf.addLine(to: leafEnd)
-        context.stroke(leaf, with: .color(.white.opacity(0.55)), lineWidth: 1.2)
+        context.stroke(leaf, with: .color(ink.opacity(0.7)), lineWidth: 1.2)
         var arc = Path()
         arc.addArc(center: a, radius: radius, startAngle: .radians(start), endAngle: .radians(end), clockwise: side < 0)
-        context.stroke(arc, with: .color(.white.opacity(0.3)), style: StrokeStyle(lineWidth: 0.8, dash: [2, 2]))
+        context.stroke(arc, with: .color(ink.opacity(0.6)), style: StrokeStyle(lineWidth: 0.8, dash: [2, 2]))
     }
 
     /// +1 or −1: the side of the wall (in screen space) that lies inside a room.
@@ -213,7 +215,7 @@ struct PlanPainter {
             var path = Path()
             path.move(to: a)
             path.addLine(to: b)
-            let color = link.quality.color
+            let color = snapshot.printPalette ? Color.black : link.quality.color
             context.stroke(path, with: .color(color.opacity(0.9)), style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: link.quality == .wired ? [1, 5] : [3, 5]))
             guard let rssi = link.rssi else { continue }
             // Middle of the link, pushed sideways so it does not sit on the line or the nodes.
@@ -223,7 +225,7 @@ struct PlanPainter {
             let resolved = context.resolve(Text(Format.dbm(rssi)).font(.caption2.weight(.semibold)).foregroundStyle(color))
             let size = resolved.measure(in: CGSize(width: 200, height: 40))
             let box = CGRect(x: mid.x - size.width / 2 - 6, y: mid.y - size.height / 2 - 3, width: size.width + 12, height: size.height + 6)
-            context.fill(Path(roundedRect: box, cornerRadius: box.height / 2), with: .color(.black.opacity(0.75)))
+            context.fill(Path(roundedRect: box, cornerRadius: box.height / 2), with: .color(snapshot.printPalette ? .white : .black.opacity(0.75)))
             context.stroke(Path(roundedRect: box, cornerRadius: box.height / 2), with: .color(color.opacity(0.5)), lineWidth: 0.8)
             context.draw(resolved, at: mid)
         }
@@ -272,6 +274,7 @@ struct PlanPainter {
         let router = current.first { !$0.isSatellite }
         let satellites = current.filter(\.isSatellite)
         for (i, target) in targets.enumerated() {
+            if i == 0 && router == nil { continue }
             let t = transform.point(target)
             let from: SIMD2<Float>? = i == 0 ? router?.position : (i - 1 < satellites.count ? satellites[i - 1].position : nil)
             if let from, simd_distance(from, target) > 0.2 {
@@ -295,8 +298,11 @@ struct PlanPainter {
             let radius: CGFloat = 13
             context.fill(Path(ellipseIn: CGRect(x: c.x - radius - 6, y: c.y - radius - 6, width: (radius + 6) * 2, height: (radius + 6) * 2)), with: .color((ap.isSatellite ? Color.green : Color.cyan).opacity(0.25)))
             context.fill(Path(ellipseIn: CGRect(x: c.x - radius, y: c.y - radius, width: radius * 2, height: radius * 2)), with: .color(.white))
+            if snapshot.printPalette {
+                context.stroke(Path(ellipseIn: CGRect(x: c.x - radius, y: c.y - radius, width: radius * 2, height: radius * 2)), with: .color(.black), lineWidth: 1)
+            }
             var symbol = context.resolve(Image(systemName: ap.isSatellite ? "dot.radiowaves.left.and.right" : "wifi.router"))
-            symbol.shading = .color(ap.isSatellite ? .green : .blue)
+            symbol.shading = .color(snapshot.printPalette ? .black : (ap.isSatellite ? .green : .blue))
             context.draw(symbol, at: c)
         }
     }
