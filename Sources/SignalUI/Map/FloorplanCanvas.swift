@@ -50,6 +50,16 @@ struct FloorplanCanvas: View {
                 ForEach(project.accessPoints.filter { $0.floor == model.floor }) { ap in
                     AccessPointNode(ap: ap, transform: transform, onOpenInspector: onOpenInspector)
                 }
+
+                #if DEBUG
+                Color.clear
+                    .frame(width: 1, height: 1)
+                    .allowsHitTesting(false)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityIdentifier("heatmap")
+                    .accessibilityLabel("Signal heatmap")
+                    .accessibilityValue("generation=\(model.heatmapPublishCount),live=\(model.liveHeatmapPublishCount)")
+                #endif
             }
             .coordinateSpace(.named(PlanSpace.name))
             .accessibilityElement(children: .contain)

@@ -280,4 +280,50 @@ final class SignalUITests: XCTestCase {
             XCTAssertTrue(app.buttons["probe"].exists, "Probe pin should remain visible on the active floor after undoing an edit")
         }
     }
+
+    private func parseHeatmapCounts(_ value: String?) -> (generation: Int, live: Int)? {
+        guard let value else { return nil }
+        var gen: Int?
+        var live: Int?
+        for part in value.split(separator: ",") {
+            let kv = part.split(separator: "=")
+            guard kv.count == 2, let n = Int(kv[1]) else { continue }
+            if kv[0] == "generation" { gen = n }
+            else if kv[0] == "live" { live = n }
+        }
+        guard let g = gen, let l = live else { return nil }
+        return (g, l)
+    }
+
+    func testHeatmapUpdatesMidDragDuringRouterDrag() throws {
+        let app = launchDemoApp()
+
+        let router = app.buttons["router"]
+        let heatmap = app.descendants(matching: .any)["heatmap"]
+        XCTAssertTrue(router.waitForExistence(timeout: 10))
+        XCTAssertTrue(heatmap.waitForExistence(timeout: 5))
+
+        let initialReady = NSPredicate { _, _ in
+            guard let counts = self.parseHeatmapCounts(heatmap.value as? String) else { return false }
+            return counts.generation >= 1
+        }
+        XCTAssertEqual(XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: initialReady, object: nil)], timeout: 5), .completed)
+        let baseline = try XCTUnwrap(parseHeatmapCounts(heatmap.value as? String))
+        XCTAssertEqual(baseline.live, 0)
+
+        let routerStartFrame = router.frame
+        let startCoord = router.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let endCoord = startCoord.withOffset(CGVector(dx: -55, dy: -30))
+        startCoord.press(forDuration: 0.1, thenDragTo: endCoord, withVelocity: .slow, thenHoldForDuration: 0.4)
+
+        let postDragReady = NSPredicate { _, _ in
+            guard let counts = self.parseHeatmapCounts(heatmap.value as? String) else { return false }
+            return counts.live > baseline.live && counts.generation >= baseline.generation + 2
+        }
+        XCTAssertEqual(XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: postDragReady, object: nil)], timeout: 5), .completed)
+        let afterDrag = try XCTUnwrap(parseHeatmapCounts(heatmap.value as? String))
+        XCTAssertGreaterThan(afterDrag.live, baseline.live, "Heatmap should publish at least one .live update mid-drag")
+        XCTAssertGreaterThanOrEqual(afterDrag.generation, baseline.generation + 2, "Heatmap should publish mid-drag .live update(s) and final .full drop update")
+        XCTAssertGreaterThan(hypot(router.frame.midX - routerStartFrame.midX, router.frame.midY - routerStartFrame.midY), 15)
+    }
 }
