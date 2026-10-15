@@ -6,36 +6,50 @@ import SignalCore
 struct RoomScanView: View {
     @Environment(FloorplanViewModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var controller = ScanController()
     @State private var confirmCancel = false
     @State private var creating = false
+    @State private var creationTask: Task<Void, Never>?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        ZStack {
-            CaptureViewRepresentable(captureView: controller.captureView)
-                .ignoresSafeArea()
+        GeometryReader { geometry in
+            ZStack {
+                CaptureViewRepresentable(captureView: controller.captureView)
+                    .ignoresSafeArea()
 
-            VStack(spacing: 12) {
-                topBar
-                Spacer()
-                ScrollView { bottomPanel }
-                    .frame(maxHeight: 380)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.horizontal)
+                VStack(spacing: 12) {
+                    topBar
+                    Spacer()
+                    ScrollView { bottomPanel }
+                        .frame(maxHeight: min(380, geometry.size.height * 0.65))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal)
 
-            if controller.phase == .processingRoom || controller.phase == .finishing || creating {
-                processingOverlay
+                if controller.phase == .processingRoom || controller.phase == .finishing || creating {
+                    processingOverlay
+                }
             }
         }
         .statusBarHidden(false)
-        .onDisappear { controller.cancel() }
+        .onDisappear {
+            creationTask?.cancel()
+            controller.cancel()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active {
+                creationTask?.cancel()
+                controller.interrupted()
+            }
+        }
         .onAppear {
             controller.onComplete = { capture, worldMap in
                 creating = true
-                Task {
+                creationTask = Task {
                     await model.createProject(from: capture, worldMap: worldMap)
+                    guard !Task.isCancelled else { return }
                     creating = false
                     dismiss()
                 }

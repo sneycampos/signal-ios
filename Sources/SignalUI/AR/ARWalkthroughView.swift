@@ -184,7 +184,7 @@ final class ARWalkSession {
     }
 
     fileprivate func cameraMoved(to transform: simd_float4x4, time: TimeInterval) {
-        guard status == .ready, time - lastUpdate > 0.2, let project, let alignment, let propagation else { return }
+        guard !stopped, status == .ready, time - lastUpdate > 0.2, let project, let alignment, let propagation else { return }
         lastUpdate = time
         let point = alignment.planPoint(worldX: transform.columns.3.x, worldZ: transform.columns.3.z)
         reading = FloorplanViewModel.reading(project: project, model: propagation, backhaul: backhaul, point: point, floor: floor)
@@ -220,7 +220,7 @@ final class ARWalkSession {
                 anchor.addChild(entity)
                 arView.scene.addAnchor(anchor)
             } catch {
-                status = .failed("Couldn't draw the map on the floor.")
+                failed("Couldn't draw the map on the floor.")
             }
         }
     }

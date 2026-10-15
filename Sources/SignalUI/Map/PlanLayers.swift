@@ -225,7 +225,7 @@ struct PlanPainter {
             let resolved = context.resolve(Text(Format.dbm(rssi)).font(.caption2.weight(.semibold)).foregroundStyle(color))
             let size = resolved.measure(in: CGSize(width: 200, height: 40))
             let box = CGRect(x: mid.x - size.width / 2 - 6, y: mid.y - size.height / 2 - 3, width: size.width + 12, height: size.height + 6)
-            context.fill(Path(roundedRect: box, cornerRadius: box.height / 2), with: .color(.black.opacity(0.75)))
+            context.fill(Path(roundedRect: box, cornerRadius: box.height / 2), with: .color(snapshot.printPalette ? .white : .black.opacity(0.75)))
             context.stroke(Path(roundedRect: box, cornerRadius: box.height / 2), with: .color(color.opacity(0.5)), lineWidth: 0.8)
             context.draw(resolved, at: mid)
         }

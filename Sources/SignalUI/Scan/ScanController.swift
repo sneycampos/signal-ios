@@ -121,6 +121,15 @@ final class ScanController {
 
     var hasCapturedAnything: Bool { roomsCaptured > 0 || counts.walls > 0 }
 
+    func interrupted() {
+        guard !cancelled else { return }
+        processingTask?.cancel()
+        processingTask = nil
+        phase = .failed("Scanning was interrupted. Close this scan and try again.")
+        captureView.captureSession.stop(pauseARSession: true)
+        arSession.pause()
+    }
+
     // MARK: Delegate events
 
     fileprivate func didUpdate(_ room: CapturedRoom) {
