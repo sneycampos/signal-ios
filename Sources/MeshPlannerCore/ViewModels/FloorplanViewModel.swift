@@ -65,6 +65,7 @@ public struct OptimizerComparison: Equatable, Sendable {
     public let roomsAfter: [RoomCoverage]
     public let satellitesToAdd: Int
     public let satellitesToRemove: Int
+    public let isAlreadyOptimal: Bool
 }
 
 public enum OptimizerState: Equatable, Sendable {
@@ -747,17 +748,18 @@ public final class FloorplanViewModel {
     public func applyOptimizerResult() {
         guard case .ready(let comparison) = optimizer, let snapshot = optimizerSnapshot, optimizerMatches(snapshot),
               project?.id == comparison.projectID, floor == comparison.floor else { invalidateOptimizer(); return }
+        guard !comparison.isAlreadyOptimal else { optimizer = .idle; return }
         let proposal = comparison.proposal
         let currentFloor = floor
         mutate(recompute: .full) { p in
-            if let routerIndex = p.accessPoints.firstIndex(where: { !$0.isSatellite }) {
+            if let routerIndex = p.accessPoints.firstIndex(where: { !$0.isSatellite && $0.isActive }) ?? p.accessPoints.firstIndex(where: { !$0.isSatellite }) {
                 if p.accessPoints[routerIndex].position != proposal.routerPosition {
                     p.accessPoints[routerIndex].isLocked = false
                 }
                 p.accessPoints[routerIndex].position = proposal.routerPosition
             }
             let satelliteIds = p.accessPoints
-                .filter { $0.isSatellite && $0.floor == currentFloor }
+                .filter { $0.isSatellite && $0.floor == currentFloor && $0.isActive }
                 .sorted { ($0.backhaul == .wired ? 0 : 1) < ($1.backhaul == .wired ? 0 : 1) }
                 .map(\.id)
             for (i, position) in proposal.satellitePositions.enumerated() {
@@ -784,29 +786,79 @@ public final class FloorplanViewModel {
         let mask = InteriorMask(grid: grid, polygons: rooms.map(\.polygon))
 
         let beforeAPs = project.accessPoints
-        var afterAPs = project.accessPoints.filter { !($0.isSatellite && $0.floor == floor) }
-        if let r = afterAPs.firstIndex(where: { !$0.isSatellite }) { afterAPs[r].position = proposal.routerPosition }
         let existing = project.accessPoints
-            .filter { $0.isSatellite && $0.floor == floor }
+            .filter { $0.isSatellite && $0.floor == floor && $0.isActive }
             .sorted { ($0.backhaul == .wired ? 0 : 1) < ($1.backhaul == .wired ? 0 : 1) }
+        let before = SignalFieldGenerator.compute(model: model, accessPoints: beforeAPs, floor: floor, mask: mask, scale: scale)
+        let beforeSummary = before?.coverage ?? .empty
+        let roomsBefore = before?.roomCoverage(rooms: rooms, accessPoints: beforeAPs) ?? []
+
+        let currentRouterPos = (project.accessPoints.first { !$0.isSatellite && $0.isActive } ?? project.router)?.position ?? proposal.routerPosition
+        let currentSatPositions = existing.map(\.position)
+        let positionsUnchanged = simd_distance(proposal.routerPosition, currentRouterPos) < 1e-3
+            && proposal.satellitePositions.count == currentSatPositions.count
+            && zip(proposal.satellitePositions, currentSatPositions).allSatisfy { simd_distance($0, $1) < 1e-3 }
+
+        func alreadyOptimalComparison() -> OptimizerComparison {
+            let fallbackProposal = PlacementProposal(
+                routerPosition: currentRouterPos,
+                satellitePositions: currentSatPositions,
+                recommendedSatelliteCount: currentSatPositions.count,
+                estimatedCoverageBySatelliteCount: proposal.estimatedCoverageBySatelliteCount,
+                executionTimeMs: proposal.executionTimeMs
+            )
+            return OptimizerComparison(
+                projectID: project.id,
+                floor: floor,
+                proposal: fallbackProposal,
+                band: band,
+                before: beforeSummary,
+                after: beforeSummary,
+                roomsBefore: roomsBefore,
+                roomsAfter: roomsBefore,
+                satellitesToAdd: 0,
+                satellitesToRemove: 0,
+                isAlreadyOptimal: true
+            )
+        }
+
+        if positionsUnchanged {
+            return alreadyOptimalComparison()
+        }
+
+        var afterAPs = project.accessPoints.filter { !($0.isSatellite && $0.floor == floor && $0.isActive) }
+        if let r = afterAPs.firstIndex(where: { !$0.isSatellite && $0.isActive }) ?? afterAPs.firstIndex(where: { !$0.isSatellite }) {
+            afterAPs[r].position = proposal.routerPosition
+        }
         for (i, position) in proposal.satellitePositions.enumerated() {
             var sat = i < existing.count ? existing[i] : RFAccessPoint(name: "", position: position, isSatellite: true, floor: floor)
             sat.position = position
             afterAPs.append(sat)
         }
-        let before = SignalFieldGenerator.compute(model: model, accessPoints: beforeAPs, floor: floor, mask: mask, scale: scale)
         let after = SignalFieldGenerator.compute(model: model, accessPoints: afterAPs, floor: floor, mask: mask, scale: scale)
+        let afterSummary = after?.coverage ?? .empty
+        let roomsAfter = after?.roomCoverage(rooms: rooms, accessPoints: afterAPs) ?? []
+
+        let noImprovement = afterSummary.coveredPercent <= beforeSummary.coveredPercent + 0.05
+            && proposal.satellitePositions.count == existing.count
+            && afterSummary.medianRSSI <= beforeSummary.medianRSSI
+
+        if afterSummary.coveredPercent < beforeSummary.coveredPercent || noImprovement {
+            return alreadyOptimalComparison()
+        }
+
         return OptimizerComparison(
             projectID: project.id,
             floor: floor,
             proposal: proposal,
             band: band,
-            before: before?.coverage ?? .empty,
-            after: after?.coverage ?? .empty,
-            roomsBefore: before?.roomCoverage(rooms: rooms, accessPoints: beforeAPs) ?? [],
-            roomsAfter: after?.roomCoverage(rooms: rooms, accessPoints: afterAPs) ?? [],
+            before: beforeSummary,
+            after: afterSummary,
+            roomsBefore: roomsBefore,
+            roomsAfter: roomsAfter,
             satellitesToAdd: max(0, proposal.satellitePositions.count - existing.count),
-            satellitesToRemove: max(0, existing.count - proposal.satellitePositions.count)
+            satellitesToRemove: max(0, existing.count - proposal.satellitePositions.count),
+            isAlreadyOptimal: false
         )
     }
 

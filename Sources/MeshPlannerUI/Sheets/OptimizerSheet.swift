@@ -43,17 +43,27 @@ struct OptimizerSheet: View {
             .navigationTitle("Best placement")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if case .ready = model.optimizer {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Discard") { model.discardOptimizerResult() }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Apply") {
-                            model.applyOptimizerResult()
-                            dismiss()
+                if case .ready(let comparison) = model.optimizer {
+                    if comparison.isAlreadyOptimal {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") {
+                                model.discardOptimizerResult()
+                                dismiss()
+                            }
+                            .fontWeight(.semibold)
                         }
-                        .fontWeight(.semibold)
-                        .accessibilityIdentifier("applyPlacement")
+                    } else {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Discard") { model.discardOptimizerResult() }
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Apply") {
+                                model.applyOptimizerResult()
+                                dismiss()
+                            }
+                            .fontWeight(.semibold)
+                            .accessibilityIdentifier("applyPlacement")
+                        }
                     }
                 } else {
                     ToolbarItem(placement: .confirmationAction) {
@@ -63,8 +73,13 @@ struct OptimizerSheet: View {
             }
             .onAppear {
                 lockRouter = model.project?.router?.isLocked ?? false
-                let current = min(6, model.project?.satellites.filter { $0.floor == model.floor }.count ?? 0)
+                let current = min(6, model.project?.satellites.filter { $0.floor == model.floor && $0.isActive }.count ?? 0)
                 choice = current > 0 ? .count(current) : .automatic
+            }
+            .onDisappear {
+                if case .ready(let comparison) = model.optimizer, comparison.isAlreadyOptimal {
+                    model.discardOptimizerResult()
+                }
             }
         }
     }
@@ -80,10 +95,10 @@ struct OptimizerSheet: View {
                         }
                     }
                 }
-                let maxSatellites = max(3, min(6, model.project?.satellites.filter { $0.floor == model.floor }.count ?? 0))
+                let maxSatellites = max(3, min(6, model.project?.satellites.filter { $0.floor == model.floor && $0.isActive }.count ?? 0))
                 Picker("Mesh satellites", selection: $choice) {
                     Text("Recommend how many").tag(SatelliteChoice.automatic)
-                    Text("None").tag(SatelliteChoice.count(0))
+                    Text("None (router only)").tag(SatelliteChoice.count(0))
                     ForEach(1...maxSatellites, id: \.self) { n in
                         Text("\(n)").tag(SatelliteChoice.count(n))
                     }
@@ -108,66 +123,107 @@ struct OptimizerSheet: View {
 
     @ViewBuilder
     private func result(_ comparison: OptimizerComparison) -> some View {
-        Section {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("Before").font(.caption).foregroundStyle(.secondary)
-                    Text(Format.percent(comparison.before.coveredPercent)).font(.title2.bold())
-                }
-                Image(systemName: "arrow.right").foregroundStyle(.secondary).frame(maxWidth: .infinity)
-                VStack(alignment: .trailing) {
-                    Text("After").font(.caption).foregroundStyle(.secondary)
-                    Text(Format.percent(comparison.after.coveredPercent)).font(.title2.bold()).foregroundStyle(.green)
-                }
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(Text("Coverage from \(Format.percent(comparison.before.coveredPercent)) to \(Format.percent(comparison.after.coveredPercent))"))
-            if comparison.satellitesToAdd == 1 {
-                Label("Add 1 satellite", systemImage: "plus.circle")
-            } else if comparison.satellitesToAdd > 1 {
-                Label("Add \(comparison.satellitesToAdd) satellites", systemImage: "plus.circle")
-            }
-            if comparison.satellitesToRemove == 1 {
-                Label("1 satellite is no longer needed", systemImage: "minus.circle")
-            } else if comparison.satellitesToRemove > 1 {
-                Label("\(comparison.satellitesToRemove) satellites are no longer needed", systemImage: "minus.circle")
-            }
-            if comparison.after.coveredPercent < comparison.before.coveredPercent + 1 {
-                Text("The current placement is already close to the best possible.").foregroundStyle(.secondary)
-            }
-        } header: {
-            Text("Area with good signal on \(comparison.band.displayName)")
-        } footer: {
-            Text("New positions appear on the map as dashed circles.")
-        }
-
-        Section("By room") {
-            ForEach(comparison.roomsAfter) { after in
-                let before = comparison.roomsBefore.first { $0.id == after.id }
+        if comparison.isAlreadyOptimal {
+            Section {
                 HStack {
-                    Text(after.name)
+                    Label("Your placement is already the best", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
                     Spacer()
-                    Text("\(Format.percent(before?.summary.coveredPercent ?? 0)) → \(Format.percent(after.summary.coveredPercent))")
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
+                    Text(Format.percent(comparison.before.coveredPercent))
+                        .font(.title2.bold())
+                }
+            } header: {
+                Text("Area with good signal on \(comparison.band.displayName)")
+            }
+
+            Section("By room") {
+                ForEach(comparison.roomsBefore) { room in
+                    HStack {
+                        Text(room.name)
+                        Spacer()
+                        Text(Format.percent(room.summary.coveredPercent))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
-        }
 
-        Section {
-            Button {
-                model.applyOptimizerResult()
-                dismiss()
-            } label: {
-                Text("Apply positions").frame(maxWidth: .infinity)
+            Section {
+                Button {
+                    model.discardOptimizerResult()
+                    dismiss()
+                } label: {
+                    Text("Done").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.clear)
+        } else {
+            Section {
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("Before").font(.caption).foregroundStyle(.secondary)
+                        Text(Format.percent(comparison.before.coveredPercent)).font(.title2.bold())
+                    }
+                    Image(systemName: "arrow.right").foregroundStyle(.secondary).frame(maxWidth: .infinity)
+                    VStack(alignment: .trailing) {
+                        Text("After").font(.caption).foregroundStyle(.secondary)
+                        Text(Format.percent(comparison.after.coveredPercent))
+                            .font(.title2.bold())
+                            .foregroundStyle(comparison.after.coveredPercent > comparison.before.coveredPercent ? .green : .primary)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(Text("Coverage from \(Format.percent(comparison.before.coveredPercent)) to \(Format.percent(comparison.after.coveredPercent))"))
+                if comparison.satellitesToAdd == 1 {
+                    Label("Add 1 satellite", systemImage: "plus.circle")
+                } else if comparison.satellitesToAdd > 1 {
+                    Label("Add \(comparison.satellitesToAdd) satellites", systemImage: "plus.circle")
+                }
+                if comparison.satellitesToRemove == 1 {
+                    Label("1 satellite is no longer needed", systemImage: "minus.circle")
+                } else if comparison.satellitesToRemove > 1 {
+                    Label("\(comparison.satellitesToRemove) satellites are no longer needed", systemImage: "minus.circle")
+                }
+                if comparison.after.coveredPercent < comparison.before.coveredPercent + 1 {
+                    Text("The current placement is already close to the best possible.").foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Area with good signal on \(comparison.band.displayName)")
+            } footer: {
+                Text("New positions appear on the map as dashed circles.")
+            }
 
-            Button("Discard", role: .cancel) { model.discardOptimizerResult() }
-                .frame(maxWidth: .infinity)
+            Section("By room") {
+                ForEach(comparison.roomsAfter) { after in
+                    let before = comparison.roomsBefore.first { $0.id == after.id }
+                    HStack {
+                        Text(after.name)
+                        Spacer()
+                        Text("\(Format.percent(before?.summary.coveredPercent ?? 0)) → \(Format.percent(after.summary.coveredPercent))")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Section {
+                Button {
+                    model.applyOptimizerResult()
+                    dismiss()
+                } label: {
+                    Text("Apply positions").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+
+                Button("Discard", role: .cancel) { model.discardOptimizerResult() }
+                    .frame(maxWidth: .infinity)
+            }
         }
     }
 }
