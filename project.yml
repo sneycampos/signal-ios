@@ -60,6 +60,7 @@ targets:
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         NSCameraUsageDescription: "Signal uses the camera and LiDAR scanner to scan your rooms and show Wi-Fi signal in augmented reality."
+        ITSAppUsesNonExemptEncryption: false
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:
@@ -69,7 +70,7 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        UIRequiredDeviceCapabilities: [arm64]
+        UIRequiredDeviceCapabilities: [arm64, arkit]
         CFBundleDocumentTypes:
           - CFBundleTypeName: Signal Project
             LSHandlerRank: Owner
