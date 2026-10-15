@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://wifi-mesh-planner.pages.dev/sitemap.xml
