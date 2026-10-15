@@ -4,6 +4,7 @@ import SignalCore
 /// Projects list → map, plus scanning, importing and opening shared `.signalsim` files.
 public struct AppRootView: View {
     @Environment(FloorplanViewModel.self) private var model
+    @Environment(\.openURL) private var openURL
     @State private var showScan = false
     @State private var showImporter = false
 
@@ -34,8 +35,21 @@ public struct AppRootView: View {
         .onOpenURL { url in
             Task { await model.importProject(from: url) }
         }
-        .alert("Something went wrong", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
-            Button("Retry saving") { Task { await model.flushSave() } }
+        .onChange(of: model.project?.id) {
+            if model.project != nil {
+                showScan = false
+                showImporter = false
+            }
+        }
+        .alert("Something went wrong", isPresented: Binding(get: { !showScan && model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
+            if model.hasUnsavedChanges {
+                Button("Retry saving") { Task { await model.flushSave() } }
+            }
+            if ScanAvailability.current == .cameraDenied {
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                }
+            }
             Button("OK", role: .cancel) {}
         } message: {
             Text(model.errorMessage ?? "")

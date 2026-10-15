@@ -8,7 +8,11 @@ enum ReportRenderer {
     @MainActor
     static func render(model: FloorplanViewModel, project: FloorplanProject) -> URL? {
         guard !model.isComputing, model.field != nil, model.project == project else { return nil }
+        let backhaul = (!model.backhaul.isEmpty || !project.satellites.contains(where: \.isActive))
+            ? model.backhaul
+            : BackhaulPlanner.plan(accessPoints: project.accessPoints, walls: project.walls, profile: project.profile, calibration: project.calibration)
         var snapshot = PlanSnapshot(model: model, project: project, drawNodes: true, drawGrid: false)
+        snapshot.backhaul = backhaul
         snapshot.printPalette = true
         snapshot.probe = nil
         snapshot.showRays = false
@@ -119,11 +123,13 @@ private struct ReportPage: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Recommendations").font(.headline)
             if weak.isEmpty {
-                Text("Every room has good signal. Keep the router elevated and away from metal and aquariums.").font(.caption)
+                Text(project.floorCount > 1
+                     ? "Every room on this floor has good signal. Keep the router elevated and away from metal and aquariums."
+                     : "Every room has good signal. Keep the router elevated and away from metal and aquariums.").font(.caption)
             } else {
                 Text("Weak signal in: \(weak.prefix(3).map(\.name).formatted(.list(type: .and)))\(weak.count > 3 ? " and \(weak.count - 3) more rooms" : ""). Use “Optimize” in the app to try another router position or a mesh satellite.").font(.caption)
             }
-            let weakBackhaul = model.backhaul.values.filter { $0.quality == .weak }
+            let weakBackhaul = snapshot.backhaul.values.filter { $0.quality == .weak }
             if !weakBackhaul.isEmpty {
                 Text("Some satellites have a weak link to the router; move them closer or use Ethernet.").font(.caption)
             }
