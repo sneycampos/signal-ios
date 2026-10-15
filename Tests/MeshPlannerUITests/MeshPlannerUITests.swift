@@ -281,6 +281,64 @@ final class MeshPlannerUITests: XCTestCase {
         }
     }
 
+    /// Opens the optimizer sheet, picks "None (router only)" and calculates.
+    private func calculateRouterOnly(in app: XCUIApplication) {
+        let optimizeButton = app.buttons["optimize"]
+        XCTAssertTrue(optimizeButton.waitForExistence(timeout: 5))
+        optimizeButton.tap()
+        XCTAssertTrue(app.navigationBars["Best placement"].waitForExistence(timeout: 5))
+
+        let picker = app.buttons["satelliteCountPicker"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 5))
+        picker.tap()
+        let routerOnly = app.buttons["None (router only)"]
+        XCTAssertTrue(routerOnly.waitForExistence(timeout: 5))
+        routerOnly.tap()
+
+        app.buttons["Calculate"].tap()
+    }
+
+    private func waitForLabel(_ element: XCUIElement, toEqual expected: String, timeout: TimeInterval) -> Bool {
+        let predicate = NSPredicate { _, _ in element.exists && element.label == expected }
+        return XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: nil)], timeout: timeout) == .completed
+    }
+
+    // (f) Router-only Optimize: the sheet's Before/After match the map, and optimizing again after Apply reports the
+    // placement as already the best (it used to offer 93% → 96% on a second run).
+    func testRouterOnlyOptimizeMatchesMapAndIsAlreadyBestAfterApply() throws {
+        let app = launchDemoApp()
+
+        let heatmap = app.descendants(matching: .any)["heatmap"]
+        XCTAssertTrue(heatmap.waitForExistence(timeout: 10))
+        let fullHeatmap = NSPredicate { _, _ in (self.parseHeatmapCounts(heatmap.value as? String)?.generation ?? 0) >= 1 }
+        XCTAssertEqual(XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: fullHeatmap, object: nil)], timeout: 10), .completed)
+        // The summary card combines its children into one element that inherits the identifier; take the bare "81%".
+        let mapCoverage = app.staticTexts
+            .matching(NSPredicate(format: "identifier == 'mapCoveragePercent' AND NOT (label CONTAINS ',')"))
+            .firstMatch
+        XCTAssertTrue(mapCoverage.waitForExistence(timeout: 5))
+        let mapBefore = mapCoverage.label
+
+        calculateRouterOnly(in: app)
+        let change = app.descendants(matching: .any)["optimizerCoverageChange"]
+        XCTAssertTrue(change.waitForExistence(timeout: 30), "The demo's default router spot should get a better proposal")
+        let prefix = "Coverage from \(mapBefore) to "
+        XCTAssertTrue(change.label.hasPrefix(prefix), "Sheet '\(change.label)' must start from the map's \(mapBefore)")
+        let proposed = String(change.label.dropFirst(prefix.count))
+
+        app.buttons["applyPlacement"].tap()
+        XCTAssertTrue(waitForLabel(mapCoverage, toEqual: proposed, timeout: 15), "Map shows \(mapCoverage.label) after Apply; the sheet promised \(proposed)")
+
+        calculateRouterOnly(in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["optimizerAlreadyOptimal"].waitForExistence(timeout: 30),
+            "Optimizing right after Apply must report the placement as already the best"
+        )
+        XCTAssertFalse(app.descendants(matching: .any)["optimizerCoverageChange"].exists)
+        app.buttons["Done"].firstMatch.tap()
+        XCTAssertEqual(mapCoverage.label, proposed)
+    }
+
     private func parseHeatmapCounts(_ value: String?) -> (generation: Int, live: Int)? {
         guard let value else { return nil }
         var gen: Int?

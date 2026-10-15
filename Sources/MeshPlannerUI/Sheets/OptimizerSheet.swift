@@ -103,6 +103,7 @@ struct OptimizerSheet: View {
                         Text("\(n)").tag(SatelliteChoice.count(n))
                     }
                 }
+                .accessibilityIdentifier("satelliteCountPicker")
             } footer: {
                 Text("Looks for positions indoors, away from walls and furniture, that maximize the area with good signal on \(model.band.displayName). Each Wi-Fi satellite needs backhaul of at least −70 dBm.")
             }
@@ -128,6 +129,7 @@ struct OptimizerSheet: View {
                 HStack {
                     Label("Your placement is already the best", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
+                        .accessibilityIdentifier("optimizerAlreadyOptimal")
                     Spacer()
                     Text(Format.percent(comparison.before.coveredPercent))
                         .font(.title2.bold())
@@ -177,6 +179,7 @@ struct OptimizerSheet: View {
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(Text("Coverage from \(Format.percent(comparison.before.coveredPercent)) to \(Format.percent(comparison.after.coveredPercent))"))
+                .accessibilityIdentifier("optimizerCoverageChange")
                 if comparison.satellitesToAdd == 1 {
                     Label("Add 1 satellite", systemImage: "plus.circle")
                 } else if comparison.satellitesToAdd > 1 {

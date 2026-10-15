@@ -67,6 +67,9 @@ public enum PlacementOptimizer {
     static let maxEvalPoints = 960
     static let maxCandidates = 220
     static let candidateDedupeDistance: Float = 0.18
+    /// Router-only search refines this many spatially diverse top candidates (plus the current position).
+    static let routerSeedCount = 6
+    static let routerSeedSpacing: Float = 1.0
 
     private struct EvalMetrics: Comparable {
         let coverage: Float
@@ -206,6 +209,11 @@ public enum PlacementOptimizer {
             return rooms.firstIndex { $0.contains(p) } ?? -1
         }
 
+        // The shared pool must not depend on where the nodes currently are (otherwise the result depends on the
+        // starting position), so current AP positions are appended last into reserved slots.
+        let currentAPReserve = min(maxCandidates / 4, 2 * ((router.floor == floor ? 1 : 0) + existingSatellites.count))
+        let poolCap = maxCandidates - currentAPReserve
+
         func addCandidate(_ p: SIMD2<Float>, priority: Bool, currentAP: Bool = false) {
             guard p.x.isFinite, p.y.isFinite, isInsideHome(p), isPlaceable(p, walls: floorWalls, obstacles: obstacles) else { return }
             let dedupeTol: Float = currentAP ? 1e-3 : candidateDedupeDistance
@@ -214,20 +222,11 @@ public enum PlacementOptimizer {
                 if currentAP { isCurrentAPCandidate[existingIdx] = true }
                 return
             }
-            guard candidates.count < maxCandidates else { return }
+            guard candidates.count < (currentAP ? maxCandidates : poolCap) else { return }
             candidates.append(p)
             isPriorityCandidate.append(priority)
             isCurrentAPCandidate.append(currentAP)
             candidateRoomIndices.append(roomIndex(for: p))
-        }
-
-        if router.floor == floor {
-            addCandidate(router.position, priority: true, currentAP: true)
-            addCandidate(RoomPlanConverter.pushAwayFromWalls(router.position, walls: floorWalls, clearance: wallClearance + 0.01), priority: true, currentAP: true)
-        }
-        for sat in existingSatellites {
-            addCandidate(sat.position, priority: true, currentAP: true)
-            addCandidate(RoomPlanConverter.pushAwayFromWalls(sat.position, walls: floorWalls, clearance: wallClearance + 0.01), priority: true, currentAP: true)
         }
 
         for room in rooms {
@@ -271,7 +270,7 @@ public enum PlacementOptimizer {
             }
         }
         let sparseReserve = min(32, rooms.count * 2)
-        let gridTargetCap = max(candidates.count, maxCandidates - sparseReserve)
+        let gridTargetCap = max(candidates.count, poolCap - sparseReserve)
         let gridSlots = max(1, gridTargetCap - candidates.count)
         if rawGridCandidates.count <= gridSlots {
             for p in rawGridCandidates {
@@ -302,6 +301,15 @@ public enum PlacementOptimizer {
                     }
                 }
             }
+        }
+
+        if router.floor == floor {
+            addCandidate(router.position, priority: true, currentAP: true)
+            addCandidate(RoomPlanConverter.pushAwayFromWalls(router.position, walls: floorWalls, clearance: wallClearance + 0.01), priority: true, currentAP: true)
+        }
+        for sat in existingSatellites {
+            addCandidate(sat.position, priority: true, currentAP: true)
+            addCandidate(RoomPlanConverter.pushAwayFromWalls(sat.position, walls: floorWalls, clearance: wallClearance + 0.01), priority: true, currentAP: true)
         }
 
         guard !evalPoints.isEmpty, !candidates.isEmpty, token?.isCancelled != true else { return nil }
@@ -765,13 +773,13 @@ public enum PlacementOptimizer {
         func backhaulPenalty(router r: SIMD2<Float>, satellites: [SIMD2<Float>]) -> Float {
             guard !satellites.isEmpty else { return 0 }
             var reachedPos: [SIMD2<Float>] = [r]
-            var reachedTx: [Float] = [router.txPower]
+            var reachedTx: [Float] = [routerTx]
             var reachedFloors: [Int] = [router.floor]
             var reachedHops: [Int] = [0]
 
             for ap in fixedAPs where ap.backhaul == .wired {
                 reachedPos.append(ap.position)
-                reachedTx.append(ap.txPower)
+                reachedTx.append(ap.txPower + request.calibration.offsetDb)
                 reachedFloors.append(ap.floor)
                 reachedHops.append(0)
             }
@@ -779,7 +787,7 @@ public enum PlacementOptimizer {
             for i in satellites.indices {
                 if satelliteIsWired(i) {
                     reachedPos.append(satellites[i])
-                    reachedTx.append(i < existingSatellites.count ? existingSatellites[i].txPower : 20.0)
+                    reachedTx.append(satelliteTx(i))
                     reachedFloors.append(floor)
                     reachedHops.append(0)
                 } else {
@@ -794,11 +802,13 @@ public enum PlacementOptimizer {
                 for (rIdx, satIdx) in remaining.enumerated() {
                     let satPos = satellites[satIdx]
                     for parent in reachedPos.indices {
-                        let refTx = reachedTx[parent]
-                        let linkRSSI = (refTx + request.calibration.offsetDb) - backhaulModel.effectiveLoss(
+                        // reachedTx already includes calibration.offsetDb (like routerTx/satelliteTx); effectiveLoss
+                        // adds it back to its reference, so pass the raw power to get exactly the link RSSI.
+                        let tx = reachedTx[parent]
+                        let linkRSSI = tx - backhaulModel.effectiveLoss(
                             from: reachedPos[parent], floorA: reachedFloors[parent],
                             to: satPos, floorB: floor,
-                            referenceTx: refTx, reflections: true
+                            referenceTx: tx - request.calibration.offsetDb, reflections: true
                         )
                         if linkRSSI > bestLinkRSSI {
                             bestLinkRSSI = linkRSSI
@@ -811,7 +821,7 @@ public enum PlacementOptimizer {
                 let satIdx = remaining.remove(at: bestIdxInRemaining)
                 let hops = bestParentHops + 1
                 reachedPos.append(satellites[satIdx])
-                reachedTx.append(satIdx < existingSatellites.count ? existingSatellites[satIdx].txPower : 20.0)
+                reachedTx.append(satelliteTx(satIdx))
                 reachedFloors.append(floor)
                 reachedHops.append(hops)
 
@@ -965,12 +975,14 @@ public enum PlacementOptimizer {
             }
             scoredUpgradedRouterCandidates.sort { $0.metrics > $1.metrics }
 
+            // The candidate pool (apart from the current AP entries) does not depend on the router's current position,
+            // so neither do these seeds; the current position is refined as one extra seed below.
             var seedPositions: [(pos: SIMD2<Float>, row: [Float])] = []
             for item in scoredUpgradedRouterCandidates {
                 let p = candidates[item.c]
-                if seedPositions.allSatisfy({ simd_distance($0.pos, p) >= 1.1 }) {
+                if seedPositions.allSatisfy({ simd_distance($0.pos, p) >= routerSeedSpacing }) {
                     seedPositions.append((p, row(candidate: item.c, tx: routerTx)))
-                    if seedPositions.count >= 3 { break }
+                    if seedPositions.count >= routerSeedCount { break }
                 }
             }
             if baselineValid && seedPositions.allSatisfy({ simd_distance($0.pos, router.position) >= 0.35 }) {

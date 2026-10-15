@@ -386,6 +386,7 @@ struct SummaryCard: View {
                     .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(.white)
                     .contentTransition(.numericText())
+                    .accessibilityIdentifier("mapCoveragePercent")
                 Text("of your home has good signal")
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.7))

@@ -364,41 +364,244 @@ struct OptimizerNeverWorseTests {
         }
     }
 
-    @Test func routerOnlyMatchesBruteForceReferenceWithinTolerance() throws {
-        var demo = DefaultApartmentFixture.makeProject()
-        let rooms = demo.rooms(onFloor: 0)
-        let obstacles = Geometry.obstacleFootprints(demo.walls, floor: 0)
-        let floorWalls = demo.walls.filter { $0.floor == 0 && $0.isActive && !$0.material.isTransparent }
-        let model = PropagationModel(walls: demo.walls, band: demo.profile.planningBand, calibration: demo.calibration, floorHeight: demo.profile.floorHeight)
-        let scale = SignalScale(profile: demo.profile)
-        let evalGrid = FieldGrid.covering(width: demo.width, depth: demo.depth, targetCell: 0.2, maxCells: 12_000)
-        let mask = InteriorMask(grid: evalGrid, polygons: rooms.map(\.polygon))
+    /// Router-only fixtures with their best achievable map coverage.
+    ///
+    /// References were computed once by brute force (scratch benchmark, not part of the suite): every position on a
+    /// 0.05 m lattice that is inside a room and `PlacementOptimizer.isPlaceable` (0.15 m wall clearance) was scored
+    /// with `SignalFieldGenerator` (reflections on) on the 0.2 m `InteriorMask` grid; the best 600 were re-scored on
+    /// the map's final grid (`FieldGrid.covering(targetCell: 0.1, maxCells: 30_000)`, the metric `compare()` uses).
+    /// Best positions: demo 96.60% @ (6.95, 6.00); brick 87.33% @ (6.95, 6.00); closed doors 87.59% @ (7.45, 5.85);
+    /// mirrored cases are the same values at y' = 10 − y. A 0.75 m grid tops out ~1 point lower and misses these.
+    enum RouterOnlyFixture: String, CaseIterable, CustomTestStringConvertible {
+        case demo, brickPartitions, closedDoors, demoMirroredY, brickPartitionsMirroredY
 
-        // Brute-force 0.75 m grid + doorway/room-center reference over the floorplan using the full SignalFieldGenerator (0.2 m, reflections: true).
-        let refGrid = FieldGrid.covering(width: demo.width, depth: demo.depth, targetCell: 0.75, maxCells: 600)
-        var refPoints: [SIMD2<Float>] = [SIMD2(6.0, 5.0), SIMD2(5.8, 5.0), SIMD2(6.2, 5.0)] + rooms.map(\.labelPoint)
-        for row in 0..<refGrid.rows {
-            for col in 0..<refGrid.cols {
-                refPoints.append(refGrid.center(col: col, row: row))
+        var testDescription: String { rawValue }
+
+        var referenceCoverage: Float {
+            switch self {
+            case .demo, .demoMirroredY: 96.60
+            case .brickPartitions, .brickPartitionsMirroredY: 87.33
+            case .closedDoors: 87.59
             }
         }
-        var bruteForceBestCoverage: Float = 0
-        for p in refPoints {
-            guard rooms.contains(where: { $0.contains(p) }),
-                  PlacementOptimizer.isPlaceable(p, walls: floorWalls, obstacles: obstacles) else { continue }
-            let ap = RFAccessPoint(name: "Router", position: p, txPower: demo.accessPoints[0].txPower, floor: 0)
-            if let field = SignalFieldGenerator.compute(model: model, accessPoints: [ap], floor: 0, mask: mask, scale: scale, reflections: true) {
-                if field.coverage.coveredPercent > bruteForceBestCoverage {
-                    bruteForceBestCoverage = field.coverage.coveredPercent
+
+        var isMirrored: Bool { self == .demoMirroredY || self == .brickPartitionsMirroredY }
+
+        func project() -> FloorplanProject {
+            var project = DefaultApartmentFixture.makeProject()
+            switch self {
+            case .demo, .demoMirroredY:
+                break
+            case .brickPartitions, .brickPartitionsMirroredY:
+                project.walls = project.walls.map { wall in
+                    var wall = wall
+                    if wall.kind == .wall { wall.material = .brick }
+                    return wall
                 }
+            case .closedDoors:
+                project.walls = DefaultApartmentFixture.makeDefaultWalls(closeDoors: true)
             }
+            guard isMirrored else { return project }
+            let depth = project.depth
+            project.walls = project.walls.map { wall in
+                var wall = wall
+                wall.p1.y = depth - wall.p1.y
+                wall.p2.y = depth - wall.p2.y
+                return wall
+            }
+            project.rooms = project.rooms.map { room in
+                var room = room
+                room.polygon = room.polygon.reversed().map { SIMD2($0.x, depth - $0.y) }
+                return room
+            }
+            return project
         }
-        #expect(bruteForceBestCoverage >= 86.0)
 
-        // Start from a weak corner (~38% coverage) and run router-only optimization.
+        /// Weak corners/rooms plus the demo's default router spot (which used to stop in a local optimum).
+        var starts: [SIMD2<Float>] {
+            let base: [SIMD2<Float>] = [[3.0, 2.5], [9.5, 4.8], [13.3, 9.3], [1.0, 9.0], [12.5, 1.2], [8.0, 4.8]]
+            return isMirrored ? base.map { SIMD2($0.x, DefaultApartmentFixture.depth - $0.y) } : base
+        }
+    }
+
+    private static func routerOnlyRequest(_ project: FloorplanProject) -> PlacementRequest {
+        PlacementRequest(
+            walls: project.walls,
+            rooms: project.rooms,
+            accessPoints: project.accessPoints,
+            profile: project.profile,
+            calibration: project.calibration,
+            width: project.width,
+            depth: project.depth,
+            floor: 0,
+            satellites: .exactly(0),
+            lockRouter: false
+        )
+    }
+
+    private static func project(_ fixture: RouterOnlyFixture, routerAt start: SIMD2<Float>) -> FloorplanProject {
+        var project = fixture.project()
+        let floorWalls = project.walls.filter { $0.floor == 0 && $0.isActive && !$0.material.isTransparent }
+        project.accessPoints[0].position = RoomPlanConverter.pushAwayFromWalls(start, walls: floorWalls, clearance: PlacementOptimizer.wallClearance + 0.01)
+        project.accessPoints[0].isLocked = false
+        return project
+    }
+
+    @Test(arguments: RouterOnlyFixture.allCases)
+    func routerOnlyReachesBruteForceReferenceFromEveryStart(fixture: RouterOnlyFixture) throws {
+        var results: [Float] = []
+        for start in fixture.starts {
+            let project = Self.project(fixture, routerAt: start)
+            let proposal = try #require(PlacementOptimizer.optimize(Self.routerOnlyRequest(project)))
+            let comp = FloorplanViewModel.compare(project: project, proposal: proposal, floor: 0)
+            #expect(
+                comp.after.coveredPercent >= fixture.referenceCoverage - 1.0,
+                "\(fixture) from \(start) (\(comp.before.coveredPercent)%) reached \(comp.after.coveredPercent)% at \(comp.proposal.routerPosition); brute-force optimum is \(fixture.referenceCoverage)%"
+            )
+            results.append(comp.after.coveredPercent)
+        }
+        // The answer must not depend on where the router starts.
+        let spread = (results.max() ?? 0) - (results.min() ?? 0)
+        #expect(spread <= 0.5, "\(fixture): router-only results differ by \(spread) points across starts: \(results)")
+    }
+
+    @Test(arguments: RouterOnlyFixture.allCases)
+    func routerOnlyOptimizeApplyOptimizeIsIdempotent(fixture: RouterOnlyFixture) throws {
+        for start in [fixture.starts[0], fixture.starts[5]] {
+            var project = Self.project(fixture, routerAt: start)
+            let first = try #require(PlacementOptimizer.optimize(Self.routerOnlyRequest(project)))
+            let firstComp = FloorplanViewModel.compare(project: project, proposal: first, floor: 0)
+            if !firstComp.isAlreadyOptimal {
+                project.accessPoints = FloorplanViewModel.applyingProposal(firstComp.proposal, to: project.accessPoints, floor: 0)
+            }
+
+            let second = try #require(PlacementOptimizer.optimize(Self.routerOnlyRequest(project)))
+            let secondComp = FloorplanViewModel.compare(project: project, proposal: second, floor: 0)
+            #expect(
+                secondComp.isAlreadyOptimal,
+                "\(fixture) from \(start): after applying \(firstComp.after.coveredPercent)%, Optimize again offered \(secondComp.before.coveredPercent)% → \(secondComp.after.coveredPercent)%"
+            )
+            #expect(secondComp.after.coveredPercent - secondComp.before.coveredPercent < FloorplanViewModel.minimumCoverageGain)
+        }
+    }
+
+    @Test func compareReportsTrivialGainsAsAlreadyOptimalAndMatchesTheMap() throws {
+        let demo = DefaultApartmentFixture.makeProject()
+        let router = demo.accessPoints[0].position
+
+        // "Before" uses the map's final-render grid, so it equals the coverage summary shown on the map.
+        let grid = FieldGrid.covering(width: demo.width, depth: demo.depth, targetCell: 0.1, maxCells: 30_000)
+        let mask = InteriorMask(grid: grid, polygons: demo.rooms(onFloor: 0).map(\.polygon))
+        let model = PropagationModel(walls: demo.walls, band: demo.selectedBand, calibration: demo.calibration, floorHeight: demo.profile.floorHeight)
+        let mapField = try #require(SignalFieldGenerator.compute(model: model, accessPoints: demo.accessPoints, floor: 0, mask: mask, scale: SignalScale(profile: demo.profile)))
+
+        // A 5 cm nudge changes coverage by far less than a point: not worth proposing.
+        let nudge = PlacementProposal(
+            routerPosition: router + SIMD2<Float>(0.05, 0),
+            satellitePositions: [],
+            recommendedSatelliteCount: 0,
+            estimatedCoverageBySatelliteCount: [80],
+            executionTimeMs: 0
+        )
+        let comp = FloorplanViewModel.compare(project: demo, proposal: nudge, floor: 0)
+        #expect(comp.before.coveredPercent == mapField.coverage.coveredPercent)
+        #expect(comp.isAlreadyOptimal)
+        #expect(comp.after == comp.before)
+        #expect(comp.proposal.routerPosition == router)
+    }
+
+    /// The user-visible flow through the view model: the sheet's "Before" equals the map, "After" equals the map once
+    /// applied, and optimizing again right away reports the placement as already the best.
+    @Test(arguments: RouterOnlyFixture.allCases)
+    @MainActor func viewModelOptimizeApplyOptimizeMatchesTheMapAndSettles(fixture: RouterOnlyFixture) async throws {
+        // starts[5] is the demo's default router spot, where Optimize used to stop at 93% and then offer 96%.
+        let base = Self.project(fixture, routerAt: fixture.starts[5])
+        let project = FloorplanProject(
+            id: UUID().uuidString,
+            name: base.name,
+            width: base.width,
+            depth: base.depth,
+            walls: base.walls,
+            accessPoints: base.accessPoints,
+            rooms: base.rooms,
+            probe: base.probe
+        )
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ProjectStore(rootDirectory: root)
+        try await store.save(project)
+
+        let model = FloorplanViewModel(store: store)
+        await model.open(id: project.id)
+        try await Self.waitUntil { !model.isComputing && (model.field?.grid.cell ?? 1) <= 0.11 }
+
+        let first = try await Self.runRouterOnly(model)
+        #expect(!first.isAlreadyOptimal, "\(fixture): a weak start must get a proposal")
+        #expect(first.before.coveredPercent == model.coverage.coveredPercent, "\(fixture): sheet Before \(first.before.coveredPercent)% vs map \(model.coverage.coveredPercent)%")
+        #expect(first.after.coveredPercent >= fixture.referenceCoverage - 1.0)
+
+        let published = model.heatmapPublishCount
+        model.applyOptimizerResult()
+        try await Self.waitUntil { model.heatmapPublishCount > published && !model.isComputing && (model.field?.grid.cell ?? 1) <= 0.11 }
+        #expect(model.project?.router?.position == first.proposal.routerPosition)
+        #expect(model.coverage.coveredPercent == first.after.coveredPercent, "\(fixture): sheet After \(first.after.coveredPercent)% vs map \(model.coverage.coveredPercent)% after applying")
+
+        let second = try await Self.runRouterOnly(model)
+        #expect(second.isAlreadyOptimal, "\(fixture): Optimize right after Apply offered \(second.before.coveredPercent)% → \(second.after.coveredPercent)%")
+        #expect(second.before.coveredPercent == model.coverage.coveredPercent)
+        await model.close()
+    }
+
+    @MainActor private static func runRouterOnly(_ model: FloorplanViewModel) async throws -> OptimizerComparison {
+        model.runOptimizer(satellites: .exactly(0), lockRouter: false)
+        try await waitUntil {
+            if case .running = model.optimizer { return false }
+            return true
+        }
+        guard case .ready(let comparison) = model.optimizer else {
+            Issue.record("Expected optimizer ready state, got \(model.optimizer)")
+            throw CancellationError()
+        }
+        return comparison
+    }
+
+    @MainActor private static func waitUntil(_ condition: () -> Bool) async throws {
+        let deadline = ContinuousClock.now + .seconds(15)
+        while !condition(), ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(condition(), "Background work did not reach the expected state")
+    }
+
+    @Test func compareCountsAClearlyStrongerSignalAsAnImprovement() throws {
+        // Open 5 m studio: the corner router already covers (almost) everything, so coverage barely changes, but the
+        // centre gives a much stronger median signal — that is still worth proposing.
+        let studio = FloorplanProject(
+            id: "studio",
+            name: "Studio",
+            width: 5,
+            depth: 5,
+            walls: [],
+            accessPoints: [RFAccessPoint(name: "Router", position: [0.6, 0.6])],
+            rooms: [RoomInfo(name: "Studio", kind: .livingRoom, polygon: [[0, 0], [5, 0], [5, 5], [0, 5]])],
+            probe: [4, 4]
+        )
+        let centre = PlacementProposal(routerPosition: [2.5, 2.5], satellitePositions: [], recommendedSatelliteCount: 0, estimatedCoverageBySatelliteCount: [100], executionTimeMs: 0)
+        let comp = FloorplanViewModel.compare(project: studio, proposal: centre, floor: 0)
+        try #require(comp.before.coveredPercent > 100 - FloorplanViewModel.minimumCoverageGain, "Fixture must exercise the median rule")
+        #expect(!comp.isAlreadyOptimal)
+        #expect(comp.after.medianRSSI >= comp.before.medianRSSI + FloorplanViewModel.minimumMedianGainDb)
+    }
+
+    /// Reference computed once by brute force (scratch benchmark): router locked at (13.3, 9.3) in the demo, one
+    /// satellite tried at every placeable 0.2 m grid point whose direct backhaul from the router is ≥ −70 dBm, scored
+    /// on the map's 0.1 m grid. Best: 98.14% with the satellite at (3.70, 5.90).
+    @Test func oneSatelliteWithLockedWeakRouterMatchesBruteForceReference() throws {
+        var demo = DefaultApartmentFixture.makeProject()
         demo.accessPoints[0].position = SIMD2<Float>(13.3, 9.3)
-        demo.accessPoints[0].isLocked = false
-        let req = PlacementRequest(
+        demo.accessPoints[0].isLocked = true
+        let request = PlacementRequest(
             walls: demo.walls,
             rooms: demo.rooms,
             accessPoints: demo.accessPoints,
@@ -407,15 +610,45 @@ struct OptimizerNeverWorseTests {
             width: demo.width,
             depth: demo.depth,
             floor: 0,
-            satellites: .exactly(0),
+            satellites: .exactly(1),
+            lockRouter: true
+        )
+        let proposal = try #require(PlacementOptimizer.optimize(request))
+        #expect(proposal.routerPosition == demo.accessPoints[0].position)
+        let comp = FloorplanViewModel.compare(project: demo, proposal: proposal, floor: 0)
+        #expect(comp.satellitesToAdd == 1)
+        #expect(comp.after.coveredPercent >= 98.14 - 1.0, "1 satellite reached \(comp.after.coveredPercent)% at \(proposal.satellitePositions)")
+    }
+
+    /// Calibration shifts every transmitter by `offsetDb`; satellite backhaul checks must include it like coverage does.
+    @Test(arguments: [Float(-6), Float(4)])
+    func calibratedSatellitesKeepBackhaulAndNeverMakeThingsWorse(offsetDb: Float) throws {
+        var demo = DefaultApartmentFixture.makeProject()
+        demo.calibration = Calibration(offsetDb: offsetDb)
+        demo.accessPoints[0].position = SIMD2<Float>(3.0, 2.5)
+        let request = PlacementRequest(
+            walls: demo.walls,
+            rooms: demo.rooms,
+            accessPoints: demo.accessPoints,
+            profile: demo.profile,
+            calibration: demo.calibration,
+            width: demo.width,
+            depth: demo.depth,
+            floor: 0,
+            satellites: .exactly(2),
             lockRouter: false
         )
-        let proposal = try #require(PlacementOptimizer.optimize(req))
+        let proposal = try #require(PlacementOptimizer.optimize(request))
+        #expect(proposal.satellitePositions.count == 2)
+        let backhaul = PropagationModel(walls: demo.walls, band: demo.profile.effectiveBackhaulBand, calibration: demo.calibration, floorHeight: demo.profile.floorHeight)
+        let nodes = [proposal.routerPosition] + proposal.satellitePositions
+        for (i, sat) in proposal.satellitePositions.enumerated() {
+            let others = nodes.enumerated().filter { $0.offset != i + 1 }.map(\.element)
+            let best = others.map { backhaul.rssi(from: RFAccessPoint(name: "", position: $0), to: sat, floor: 0, reflections: false) }.max() ?? -200
+            #expect(best >= PlacementOptimizer.minimumBackhaulRSSI - 0.5, "offset \(offsetDb) dB: satellite \(i) backhaul \(best) dBm")
+        }
         let comp = FloorplanViewModel.compare(project: demo, proposal: proposal, floor: 0)
-        #expect(
-            comp.after.coveredPercent >= bruteForceBestCoverage - 1.5,
-            "Optimizer after (\(comp.after.coveredPercent)%) should be within 1.5% of brute-force reference (\(bruteForceBestCoverage)%)"
-        )
+        #expect(comp.after.coveredPercent >= comp.before.coveredPercent)
     }
 
     @Test @MainActor func lockedSatelliteStaysPutAndUnlockedSatellitesPreserveIdentity() async throws {

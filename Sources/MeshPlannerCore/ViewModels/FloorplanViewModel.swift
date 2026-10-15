@@ -818,13 +818,19 @@ public final class FloorplanViewModel {
         return result
     }
 
+    /// Smallest coverage gain (percentage points) that `compare` reports as an improvement for the same node count.
+    nonisolated static let minimumCoverageGain: Float = 1.0
+    /// A smaller coverage gain still counts when the median signal rises by at least this much.
+    nonisolated static let minimumMedianGainDb: Float = 3.0
+
     /// Before/after coverage with the full model (direct + reflections), so the numbers match the map.
     nonisolated static func compare(project: FloorplanProject, proposal: PlacementProposal, floor: Int) -> OptimizerComparison {
         let band = project.profile.supportedBands.contains(project.selectedBand) ? project.selectedBand : project.profile.planningBand
         let scale = SignalScale(profile: project.profile)
         let model = PropagationModel(walls: project.walls, band: band, calibration: project.calibration, floorHeight: project.profile.floorHeight)
         let rooms = project.rooms(onFloor: floor)
-        let grid = FieldGrid.covering(width: project.width, depth: project.depth, targetCell: 0.2, maxCells: 12_000)
+        // Same grid as the map's final render (`recompute(.full)`), so "Before" equals the map summary exactly.
+        let grid = FieldGrid.covering(width: project.width, depth: project.depth, targetCell: 0.1, maxCells: 30_000)
         let mask = InteriorMask(grid: grid, polygons: rooms.map(\.polygon))
 
         let beforeAPs = project.accessPoints
@@ -877,9 +883,11 @@ public final class FloorplanViewModel {
         let afterSummary = after?.coverage ?? .empty
         let roomsAfter = after?.roomCoverage(rooms: rooms, accessPoints: afterAPs) ?? []
 
-        let noImprovement = afterSummary.coveredPercent <= beforeSummary.coveredPercent + 0.05
+        // Moving the same nodes for less than a point of coverage (and no clearly stronger signal) is not worth
+        // proposing: it is within the model's grid noise and would make Optimize suggest a new spot every run.
+        let noImprovement = afterSummary.coveredPercent < beforeSummary.coveredPercent + minimumCoverageGain
             && proposal.satellitePositions.count == existing.count
-            && afterSummary.medianRSSI <= beforeSummary.medianRSSI
+            && afterSummary.medianRSSI < beforeSummary.medianRSSI + minimumMedianGainDb
 
         if afterSummary.coveredPercent < beforeSummary.coveredPercent || noImprovement {
             return alreadyOptimalComparison()
