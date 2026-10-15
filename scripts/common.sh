@@ -38,9 +38,14 @@ generate() {
   (cd "$ROOT" && xcodegen generate --quiet)
 }
 
-# Available simulators whose iOS runtime meets the deployment target (17).
+# Available simulators in the newest iOS runtime that meets the deployment target (17).
 simulators() {
-  xcrun simctl list devices available | awk '/^-- iOS / { split($3, v, "."); ok = (v[1] + 0 >= 17); next } /^-- / { ok = 0; next } ok'
+  xcrun simctl list devices available | awk '
+    /^-- iOS / { split($3, v, "."); ok = (v[1] + 0 >= 17); if (ok) buf = ""; next }
+    /^-- / { ok = 0; next }
+    ok { buf = buf $0 "\n" }
+    END { printf "%s", buf }
+  '
 }
 
 # Pick an available iPhone simulator (override with SIMULATOR="iPhone 17 Pro").
@@ -48,10 +53,10 @@ pick_simulator() {
   local name="${SIMULATOR:-}"
   local line
   if [[ -n "$name" ]]; then
-    line=$(simulators | grep -F "    $name (" | tail -n 1 || true)
+    line=$(simulators | grep -F "    $name (" | awk 'NR==1' || true)
     [[ -n "$line" ]] || die "No available simulator named '$name'. See: xcrun simctl list devices available"
   else
-    line=$(simulators | grep -E "^ +iPhone" | tail -n 1 || true)
+    line=$(simulators | grep -E "^ +iPhone" | awk 'NR==1' || true)
     [[ -n "$line" ]] || die "No iPhone simulator available. Install an iOS runtime in Xcode > Settings > Components."
   fi
   echo "$line" | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/'
