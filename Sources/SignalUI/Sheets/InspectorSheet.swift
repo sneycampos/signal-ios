@@ -280,6 +280,7 @@ private struct AccessPointEditor: View {
             TextField("Name", text: $name)
                 .focused($nameFocused)
                 .onSubmit { commitName(for: ap.id) }
+                .accessibilityIdentifier("inspectorNameField")
             Stepper(value: Binding(get: { Int(ap.txPower) }, set: { value in model.updateAccessPoint(id: ap.id) { $0.txPower = Float(value) } }), in: 10...30) {
                 LabeledContent("Power", value: Format.dbm(ap.txPower))
             }
@@ -367,6 +368,7 @@ private struct RoomDetail: View {
             TextField("Name", text: $name)
                 .focused($nameFocused)
                 .onSubmit { commitName(for: room.id) }
+                .accessibilityIdentifier("inspectorNameField")
             Picker("Type", selection: Binding(get: { room.kind }, set: { model.updateRoom(id: room.id, kind: $0) })) {
                 ForEach(RoomKind.allCases) { kind in
                     Text(kind.baseName).tag(kind)
@@ -431,6 +433,7 @@ private struct RoomsSection: View {
                         .frame(minHeight: 32)
                     }
                     .accessibilityLabel(Text("\(room.name): \(Format.percent(room.summary.coveredPercent)) with good signal"))
+                    .accessibilityIdentifier("inspectorRoom-\(room.name)")
                 }
             }
         }

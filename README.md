@@ -105,12 +105,14 @@ Don't commit your personal team or bundle identifier changes.
 ## Tests
 
 ```bash
-./scripts/test.sh               # swift test: core unit tests (Swift Testing) on macOS
+./scripts/test.sh               # fast: swift test core unit tests (Swift Testing) on macOS
 ./scripts/test.sh --runner      # also the command-line verification and benchmark runner
 ./scripts/test.sh --build-app   # also compile the iOS app, which swift test does not build
+./scripts/ui-test.sh            # full end-to-end XCUITest suite in the iOS Simulator (opens Simulator.app)
+./scripts/ui-test.sh --headless # run XCUITests without opening the Simulator app window
 ```
 
-The core (`SignalCore`) is platform-independent and fully tested with `swift test`. The UI (`SignalUI`) is only compiled by the app build. Test fixtures are synthetic; never add real scans or photos of a home to the repository.
+Use `./scripts/test.sh` (or `swift test`) for fast inner-loop checks of `SignalCore`. Run `./scripts/ui-test.sh` for full end-to-end UI verification of `SignalUI` and `SignalApp` in the simulator (opens Simulator visibly by default; pass `--headless` to skip opening the Simulator window). Test fixtures are synthetic; never add real scans or photos of a home to the repository.
 
 ## Screenshots
 
@@ -146,6 +148,7 @@ All scripts use `set -euo pipefail`, accept `--help`, are safe to rerun, and con
 | `scripts/bootstrap.sh` | Checks Xcode 26+ and the iOS 26 SDK, installs XcodeGen with Homebrew if missing, generates the Xcode project. |
 | `scripts/build.sh` | Simulator or device build (unsigned), Debug or Release, optional run in the simulator with the demo. |
 | `scripts/test.sh` | `swift test`, optionally the verification runner and an app build. |
+| `scripts/ui-test.sh` | End-to-end XCUITest suite (`SignalUITests`) in the iOS Simulator (`--headless` skips opening Simulator). |
 | `scripts/screenshots.sh` | App Store screenshots from the demo project, raw and composed. |
 | `scripts/archive.sh` | Signed archive, App Store `.ipa` export, optional upload. |
 | `scripts/common.sh` | Shared helpers, sourced by the others. |
@@ -159,6 +162,7 @@ All scripts use `set -euo pipefail`, accept `--help`, are safe to rerun, and con
 | `Sources/SignalApp` | App entry point. |
 | `Sources/SignalTestRunner` | Command-line verification and benchmark. |
 | `Tests/SignalCoreTests` | Core tests (Swift Testing). |
+| `Tests/SignalUITests` | End-to-end iOS UI tests (XCUITest). |
 | `Resources/` | Assets and the privacy manifest. |
 | `scripts/` | One-shot build, test, screenshot and release scripts. |
 | `site/` | Static website (landing, privacy, support). |

@@ -12,7 +12,7 @@ Usage: scripts/test.sh [--runner] [--build-app]
   --build-app  Also compile the iOS app for the simulator (scripts/build.sh),
                to catch errors in SignalUI, which swift test does not build.
 
-The Xcode project has no XCTest target; all tests live in the Swift package.
+For end-to-end simulator UI tests (XCUITest), run scripts/ui-test.sh.
 USAGE
 }
 RUNNER=0; APP=0

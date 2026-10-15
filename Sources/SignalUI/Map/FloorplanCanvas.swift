@@ -166,9 +166,12 @@ struct RoomLabel: View {
                         .foregroundStyle(.white)
                         .lineLimit(1)
                 }
-                Text(Format.percent(coverage.summary.coveredPercent))
-                    .font(.caption2.weight(.medium).monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.7))
+                ZStack {
+                    Text("100%").hidden()
+                    Text(Format.percent(coverage.summary.coveredPercent))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+                .font(.caption2.weight(.medium).monospacedDigit())
             }
             .shadow(color: .black.opacity(0.9), radius: 3)
             .padding(4)
@@ -177,6 +180,7 @@ struct RoomLabel: View {
         .buttonStyle(.plain)
         .fixedSize()
         .accessibilityLabel(Text("\(coverage.name): \(Format.percent(coverage.summary.coveredPercent)) with good signal"))
+        .accessibilityIdentifier("roomLabel-\(coverage.name)")
     }
 }
 

@@ -63,6 +63,7 @@ struct ProjectsHomeView: View {
                     Image(systemName: "square.and.arrow.down")
                 }
                 .accessibilityLabel("Import project")
+                .accessibilityIdentifier("importProject")
             }
         }
         .onAppear { availability = ScanAvailability.current }
@@ -191,6 +192,7 @@ private struct ProjectCard: View {
             Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
         }
         .accessibilityHint("Touch and hold to delete")
+        .accessibilityIdentifier("projectRow-\(summary.id)")
     }
 
     private func ringColor(_ value: Float) -> Color {

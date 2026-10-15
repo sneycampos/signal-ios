@@ -11,6 +11,9 @@ enum ScanAvailability {
     case cameraDenied
 
     static var current: ScanAvailability {
+        #if DEBUG
+        if ScanController.isFakeScanFailureEnabled { return .available }
+        #endif
         guard RoomCaptureSession.isSupported else { return .unsupportedDevice }
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .denied, .restricted: return .cameraDenied
@@ -19,6 +22,12 @@ enum ScanAvailability {
     }
 
     static func requestCamera() async -> Bool {
+        #if DEBUG
+        if ScanController.isFakeScanFailureEnabled ||
+           ProcessInfo.processInfo.arguments.contains("-uitest-demo") {
+            return true
+        }
+        #endif
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized: return true
         case .notDetermined: return await AVCaptureDevice.requestAccess(for: .video)
@@ -46,6 +55,12 @@ final class ScanController {
         var objects = 0
     }
 
+    #if DEBUG
+    nonisolated static var isFakeScanFailureEnabled: Bool {
+        ProcessInfo.processInfo.arguments.contains("-uitest-fake-scan-failure")
+    }
+    #endif
+
     private(set) var phase: Phase = .scanning
     private(set) var roomNumber = 1
     private(set) var counts = Counts()
@@ -55,8 +70,8 @@ final class ScanController {
     private(set) var canCompleteFromWarning = false
 
     @ObservationIgnored let arSession = ARSession()
-    @ObservationIgnored private(set) var captureView: RoomCaptureView!
-    @ObservationIgnored private var delegate: ScanDelegate!
+    @ObservationIgnored private(set) var captureView: RoomCaptureView?
+    @ObservationIgnored private var delegate: ScanDelegate?
     @ObservationIgnored private var rooms: [CapturedRoom] = []
     @ObservationIgnored private var routerMarker: simd_float3?
     @ObservationIgnored private var routerStory = 0
@@ -69,15 +84,26 @@ final class ScanController {
     @ObservationIgnored var onComplete: ((RoomPlanCapture, Data?) -> Void)?
 
     init() {
-        captureView = RoomCaptureView(frame: .zero, arSession: arSession)
-        delegate = ScanDelegate(controller: self)
-        captureView.captureSession.delegate = delegate
-        captureView.delegate = delegate
+        #if DEBUG
+        if Self.isFakeScanFailureEnabled { return }
+        #endif
+        let view = RoomCaptureView(frame: .zero, arSession: arSession)
+        let scanDelegate = ScanDelegate(controller: self)
+        view.captureSession.delegate = scanDelegate
+        view.delegate = scanDelegate
+        captureView = view
+        delegate = scanDelegate
     }
 
     func start() {
         guard !cancelled else { return }
-        captureView.captureSession.run(configuration: RoomCaptureSession.Configuration())
+        #if DEBUG
+        if Self.isFakeScanFailureEnabled {
+            counts = Counts(walls: 4, doors: 1, windows: 1, objects: 0)
+            return
+        }
+        #endif
+        captureView?.captureSession.run(configuration: RoomCaptureSession.Configuration())
     }
 
     func markRouter() {
@@ -89,14 +115,27 @@ final class ScanController {
 
     func nextRoom() {
         guard phase == .scanning else { return }
+        #if DEBUG
+        if Self.isFakeScanFailureEnabled {
+            roomWarning = "Couldn't process Room \(roomNumber). Scan this room again with good light, moving the device slowly."
+            scheduleFakeFailure()
+            return
+        }
+        #endif
         finishing = false
         hadWallsInCurrentRoom = counts.walls > 0
         phase = .processingRoom
-        captureView.captureSession.stop(pauseARSession: false)
+        captureView?.captureSession.stop(pauseARSession: false)
     }
 
     func finish() {
         guard phase == .scanning else { return }
+        #if DEBUG
+        if Self.isFakeScanFailureEnabled {
+            triggerFakeFailure()
+            return
+        }
+        #endif
         finishing = true
         hadWallsInCurrentRoom = counts.walls > 0
         phase = .finishing
@@ -105,10 +144,28 @@ final class ScanController {
             Task { @MainActor in
                 guard let self, !self.cancelled, self.phase == .finishing else { return }
                 self.worldMap = data
-                self.captureView.captureSession.stop(pauseARSession: false)
+                self.captureView?.captureSession.stop(pauseARSession: false)
             }
         }
     }
+
+    #if DEBUG
+    func scheduleFakeFailure() {
+        processingTask?.cancel()
+        processingTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(1500))
+            guard let self, !Task.isCancelled, !self.cancelled else { return }
+            self.triggerFakeFailure()
+        }
+    }
+
+    func triggerFakeFailure() {
+        guard !cancelled else { return }
+        roomWarning = nil
+        canCompleteFromWarning = false
+        phase = .failed("Scanning stopped: Fake sensor failure. Close this scan and try again.")
+    }
+    #endif
 
     func dismissWarning() {
         roomWarning = nil
@@ -121,9 +178,9 @@ final class ScanController {
         canCompleteFromWarning = false
         finishing = true
         phase = .finishing
-        captureView.captureSession.delegate = nil
-        captureView.delegate = nil
-        captureView.captureSession.stop(pauseARSession: true)
+        captureView?.captureSession.delegate = nil
+        captureView?.delegate = nil
+        captureView?.captureSession.stop(pauseARSession: true)
         processingTask?.cancel()
         processingTask = Task {
             await complete()
@@ -136,9 +193,9 @@ final class ScanController {
         processingTask?.cancel()
         processingTask = nil
         onComplete = nil
-        captureView.captureSession.delegate = nil
-        captureView.delegate = nil
-        captureView.captureSession.stop(pauseARSession: true)
+        captureView?.captureSession.delegate = nil
+        captureView?.delegate = nil
+        captureView?.captureSession.stop(pauseARSession: true)
         arSession.pause()
         rooms.removeAll()
         worldMap = nil
@@ -155,22 +212,22 @@ final class ScanController {
         phase = .failed(roomsCaptured > 0
             ? "Scanning was interrupted. You can save the rooms already captured or close and try again."
             : "Scanning was interrupted. Close this scan and try again.")
-        captureView.captureSession.delegate = nil
-        captureView.delegate = nil
-        captureView.captureSession.stop(pauseARSession: true)
+        captureView?.captureSession.delegate = nil
+        captureView?.delegate = nil
+        captureView?.captureSession.stop(pauseARSession: true)
         arSession.pause()
     }
 
     // MARK: Delegate events
 
     fileprivate func didUpdate(_ room: CapturedRoom) {
-        guard !cancelled, captureView.captureSession.delegate != nil, phase == .scanning else { return }
+        guard !cancelled, captureView?.captureSession.delegate != nil, phase == .scanning else { return }
         currentStory = room.story
         counts = Counts(walls: room.walls.count, doors: room.doors.count + room.openings.count, windows: room.windows.count, objects: room.objects.count)
     }
 
     fileprivate func didEnd(with data: CapturedRoomData, error: String?) {
-        guard !cancelled, captureView.captureSession.delegate != nil else { return }
+        guard !cancelled, captureView?.captureSession.delegate != nil else { return }
         if case .failed = phase { return }
         if let error {
             roomWarning = nil
@@ -222,7 +279,7 @@ final class ScanController {
                         ? "Couldn't process Room \(roomNumber). You can scan this room again or save the rooms already captured."
                         : "Couldn't process Room \(roomNumber). Scan this room again with good light, moving the device slowly."
                 }
-                captureView.captureSession.run(configuration: RoomCaptureSession.Configuration())
+                captureView?.captureSession.run(configuration: RoomCaptureSession.Configuration())
             }
         }
     }
