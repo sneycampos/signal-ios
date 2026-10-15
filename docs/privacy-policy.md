@@ -1,12 +1,12 @@
 ---
-title: Signal — Privacy Policy
+title: Wi-Fi Mesh Planner — Privacy Policy
 ---
 
-# Privacy Policy — Signal
+# Privacy Policy — Wi-Fi Mesh Planner
 
 _Last updated: 15 October 2026_
 
-Signal ("the app") is developed by Silvio Ney.
+Wi-Fi Mesh Planner ("the app") is developed by Silvio Ney.
 
 **We do not collect any data.** The app has no account, no analytics, no advertising and no third-party SDKs, and it makes no network requests.
 
@@ -22,7 +22,7 @@ Contact: open an issue at https://github.com/sneycampos/signal-ios/issues or ema
 
 ---
 
-# Política de Privacidade — Signal (pt-PT)
+# Política de Privacidade — Wi-Fi Mesh Planner (pt-PT)
 
 **Não recolhemos quaisquer dados.** A app não tem conta, análise, publicidade nem SDKs de terceiros, e não faz pedidos de rede. A câmara e o LiDAR são usados apenas no dispositivo para digitalizar divisões e para a vista em realidade aumentada. Os projetos ficam guardados localmente e só saem do dispositivo se os exportar ou partilhar.
 

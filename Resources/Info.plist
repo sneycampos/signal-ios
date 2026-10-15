@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Signal</string>
+	<string>Mesh Planner</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>

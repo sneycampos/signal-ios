@@ -1,4 +1,6 @@
-# App Store metadata — Signal
+# App Store metadata — Wi-Fi Mesh Planner
+
+- **Home-screen name (CFBundleDisplayName):** Mesh Planner
 
 - **Bundle ID:** com.silviogodinho.signal · **Version:** 1.1.0 (build 2)
 - **Primary category:** Utilities · **Secondary:** Productivity
@@ -8,13 +10,13 @@
 
 ## English (en-US)
 
-- **Name (≤30):** Signal: Wi-Fi Coverage Planner
-- **Subtitle (≤30):** LiDAR scan, Wi-Fi heatmap
+- **Name (≤30):** Wi-Fi Mesh Planner: LiDAR Scan
+- **Subtitle (≤30):** Wi-Fi heatmap & router planner
 - **Keywords (≤100):** wifi,heatmap,mesh,router,coverage,lidar,roomplan,signal,dead zone,satellite,floor plan,network
 - **Promotional text (≤170):** Scan your home with LiDAR, place your router and mesh satellites, and see where Wi-Fi will reach before you buy or move anything.
 - **Description:**
 
-Signal turns a LiDAR scan of your home into a Wi-Fi coverage map.
+Wi-Fi Mesh Planner turns a LiDAR scan of your home into a Wi-Fi coverage map.
 
 • Scan rooms in minutes with Apple RoomPlan — walls, doors and windows are detected automatically.
 • Place your router and mesh satellites and see a live signal heatmap across every room.
@@ -30,13 +32,13 @@ Requires an iPhone or iPad with a LiDAR scanner for room scanning.
 
 ## Português (pt-PT)
 
-- **Nome:** Signal: Planeador de Wi-Fi
-- **Subtítulo:** Scan LiDAR e mapa de sinal
+- **Nome:** Wi-Fi Mesh Planner: LiDAR Scan
+- **Subtítulo:** Mapa de Wi-Fi e router
 - **Palavras-chave:** wifi,mapa,calor,mesh,router,cobertura,lidar,sinal,satélite,planta,rede,zona morta
 - **Texto promocional:** Digitalize a sua casa com LiDAR, posicione o router e os satélites mesh e veja onde chega o Wi-Fi antes de comprar ou mudar seja o que for.
 - **Descrição:**
 
-O Signal transforma uma digitalização LiDAR da sua casa num mapa de cobertura Wi-Fi.
+O Wi-Fi Mesh Planner transforma uma digitalização LiDAR da sua casa num mapa de cobertura Wi-Fi.
 
 • Digitalize divisões em minutos com o Apple RoomPlan — paredes, portas e janelas são detetadas automaticamente.
 • Posicione o router e os satélites mesh e veja um mapa de calor do sinal em tempo real.
