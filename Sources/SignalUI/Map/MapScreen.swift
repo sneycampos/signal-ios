@@ -82,6 +82,17 @@ struct MapScreen: View {
         .onChange(of: showInspector) { if showInspector { sheetDetent = .medium } }
         .onChange(of: showOptimizer) { if showOptimizer { sheetDetent = .medium } }
         .onChange(of: showCalibration) { if showCalibration { sheetDetent = .medium } }
+        .onChange(of: project.id) {
+            viewport = PlanViewport()
+            showInspector = false
+            showEquipment = false
+            showOptimizer = false
+            showCalibration = false
+            showAR = false
+            showRename = false
+            reportURL = nil
+            diagnostics = nil
+        }
         .onChange(of: model.optimizer) { _, state in
             // Lower the sheet so the proposed positions are visible on the map.
             if case .ready = state, showOptimizer { withAnimation(reduceMotion ? nil : .default) { sheetDetent = .fraction(0.3) } }
@@ -182,7 +193,7 @@ struct MapScreen: View {
                 }
                 Button { showCalibration = true } label: { Label("Calibrate with measurements", systemImage: "scope") }
                 Button { showAR = true } label: { Label("View in augmented reality", systemImage: "arkit") }
-                    .disabled(!model.hasWorldMap || project.worldAlignment == nil)
+                    .disabled(!model.hasWorldMap || project.worldAlignment == nil || model.isComputing || model.heatmapImage == nil)
             }
             Section {
                 ShareLink(item: ProjectDocument(project: project), preview: SharePreview(project.name)) {

@@ -15,6 +15,7 @@ struct RoomScanView: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let isBusy = controller.phase == .processingRoom || controller.phase == .finishing || creating
             ZStack {
                 CaptureViewRepresentable(captureView: controller.captureView)
                     .ignoresSafeArea()
@@ -27,9 +28,12 @@ struct RoomScanView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal)
+                .disabled(isBusy)
+                .accessibilityHidden(isBusy)
 
                 if controller.phase == .processingRoom || controller.phase == .finishing || creating {
                     processingOverlay
+                        .accessibilityAddTraits(.isModal)
                 }
             }
         }
@@ -39,10 +43,12 @@ struct RoomScanView: View {
             controller.cancel()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active {
-                creationTask?.cancel()
+            if phase == .background, !creating {
                 controller.interrupted()
             }
+        }
+        .onChange(of: controller.phase) { _, phase in
+            if phase != .scanning { confirmCancel = false }
         }
         .onAppear {
             controller.onComplete = { capture, worldMap in
@@ -65,10 +71,39 @@ struct RoomScanView: View {
         } message: {
             Text("Rooms already captured will be lost.")
         }
-        .alert("Couldn't finish", isPresented: Binding(get: { if case .failed = controller.phase { return true } else { return false } }, set: { _ in })) {
-            Button("OK") {
-                controller.cancel()
-                dismiss()
+        .alert("Room couldn't be processed", isPresented: Binding(get: { controller.roomWarning != nil }, set: { if !$0 { controller.dismissWarning() } })) {
+            if controller.canCompleteFromWarning, controller.roomsCaptured > 0 {
+                Button("Save \(controller.roomsCaptured == 1 ? "1 room" : "\(controller.roomsCaptured) rooms")") {
+                    controller.completeWithCapturedRooms()
+                }
+                Button("Rescan room", role: .cancel) {
+                    controller.dismissWarning()
+                }
+            } else {
+                Button("OK", role: .cancel) {
+                    controller.dismissWarning()
+                }
+            }
+        } message: {
+            Text(controller.roomWarning ?? "")
+        }
+        .alert("Couldn't finish", isPresented: Binding(get: {
+            guard !confirmCancel, controller.roomWarning == nil else { return false }
+            if case .failed = controller.phase { return true } else { return false }
+        }, set: { _ in })) {
+            if controller.roomsCaptured > 0 {
+                Button("Save \(controller.roomsCaptured == 1 ? "1 room" : "\(controller.roomsCaptured) rooms")") {
+                    controller.completeWithCapturedRooms()
+                }
+                Button("Discard", role: .destructive) {
+                    controller.cancel()
+                    dismiss()
+                }
+            } else {
+                Button("OK") {
+                    controller.cancel()
+                    dismiss()
+                }
             }
         } message: {
             if case .failed(let message) = controller.phase { Text(message) }
@@ -136,6 +171,7 @@ struct RoomScanView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
+                .disabled(controller.counts.walls == 0)
 
                 Button {
                     controller.finish()

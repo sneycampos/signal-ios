@@ -140,17 +140,28 @@ public enum RoomPlanConverter {
 
     public static func convert(_ capture: RoomPlanCapture, profile: NetworkProfile = NetworkProfile()) -> ConvertedFloorplan {
         guard !Task.isCancelled else { return cancelledPlan }
+        var usedSurfaceIDs = Set<String>()
+        func nextUniqueID(_ raw: String, in used: inout Set<String>) -> String {
+            let base = raw.isEmpty ? UUID().uuidString : raw
+            if used.insert(base).inserted { return base }
+            var index = 2
+            while !used.insert("\(base)_\(index)").inserted { index += 1 }
+            return "\(base)_\(index)"
+        }
+        let rawSurfaces = capture.surfaces.map { s in
+            RoomPlanRawSurface(id: nextUniqueID(s.id, in: &usedSurfaceIDs), p1: s.p1, p2: s.p2, height: s.height, thickness: s.thickness, category: s.category, parentId: s.parentId, isOpen: s.isOpen, story: s.story)
+        }
         // Stories → 0-based floors.
-        let storyValues = Set(capture.surfaces.map(\.story) + capture.floors.map(\.story) + capture.objects.map(\.story)).sorted()
+        let storyValues = Set(rawSurfaces.map(\.story) + capture.floors.map(\.story) + capture.objects.map(\.story)).sorted()
         let floorOf: (Int) -> Int = { story in storyValues.firstIndex(of: story) ?? 0 }
         let floorCount = max(1, storyValues.count)
 
         // 1. Rotate so the dominant wall direction lines up with the X axis.
-        let wallSurfaces = capture.surfaces.filter { $0.category == "wall" }
-        let rotation = -dominantAngle(of: wallSurfaces.isEmpty ? capture.surfaces : wallSurfaces)
+        let wallSurfaces = rawSurfaces.filter { $0.category == "wall" }
+        let rotation = -dominantAngle(of: wallSurfaces.isEmpty ? rawSurfaces : wallSurfaces)
         func rotated(_ p: SIMD2<Float>) -> SIMD2<Float> { Geometry.rotate(p, by: rotation) }
 
-        var surfaces = capture.surfaces.map { s in
+        var surfaces = rawSurfaces.map { s in
             snapToAxis(RoomPlanRawSurface(id: s.id, p1: rotated(s.p1), p2: rotated(s.p2), height: s.height, thickness: s.thickness, category: s.category, parentId: s.parentId, isOpen: s.isOpen, story: s.story))
         }
         var floorPolygons = capture.floors.map { f in (polygon: f.polygon.map(rotated), floor: floorOf(f.story)) }
@@ -166,9 +177,10 @@ public enum RoomPlanConverter {
         floorPolygons = floorPolygons.map { ($0.polygon.map { $0 + offset }, $0.floor) }
         let width = max(2, hi.x - lo.x + 2 * margin)
         let depth = max(2, hi.y - lo.y + 2 * margin)
-        var alignment = WorldAlignment(rotation: rotation, offset: offset, floorY: capture.floorY ?? 0)
+        let validFloorY = capture.floorY.flatMap { $0.isFinite && abs($0) <= 10_000 ? $0 : nil } ?? 0
+        var alignment = WorldAlignment(rotation: rotation, offset: offset, floorY: validFloorY)
         alignment.floorElevations = storyValues.enumerated().map { index, story in
-            capture.floors.filter { $0.story == story }.map(\.y).min() ?? (alignment.floorY + Float(index) * profile.floorHeight)
+            capture.floors.filter { $0.story == story }.map(\.y).filter { $0.isFinite && abs($0) <= 10_000 }.min() ?? (alignment.floorY + Float(index) * profile.floorHeight)
         }
 
         // 3. Close corners and T-junctions of structural walls.
@@ -204,6 +216,7 @@ public enum RoomPlanConverter {
 
         // 5. Cut doors, windows and openings out of their parent walls.
         var segments: [RFWallSegment] = []
+        var usedSegmentIDs = Set<String>()
         var intervalsByWall: [String: [(a: Float, b: Float, opening: RoomPlanRawSurface)]] = [:]
         var orphanOpenings: [RoomPlanRawSurface] = []
         for opening in openings {
@@ -242,8 +255,9 @@ public enum RoomPlanConverter {
             func emitWall(_ from: Float, _ to: Float) {
                 guard (to - from) * simd_distance(wall.p1, wall.p2) > 0.02 else { return }
                 piece += 1
+                let rawID = piece == 1 ? wall.id : "\(wall.id)#\(piece)"
                 segments.append(RFWallSegment(
-                    id: piece == 1 ? wall.id : "\(wall.id)#\(piece)",
+                    id: nextUniqueID(rawID, in: &usedSegmentIDs),
                     name: wallName,
                     p1: point(on: wall, at: from),
                     p2: point(on: wall, at: to),
@@ -263,7 +277,7 @@ public enum RoomPlanConverter {
                     let kind = openingKind(interval.opening)
                     let material = openingMaterial(interval.opening, exterior: exterior)
                     segments.append(RFWallSegment(
-                        id: interval.opening.id,
+                        id: nextUniqueID(interval.opening.id, in: &usedSegmentIDs),
                         name: nextName(kind),
                         p1: point(on: wall, at: a),
                         p2: point(on: wall, at: b),
@@ -282,25 +296,27 @@ public enum RoomPlanConverter {
         for opening in orphanOpenings {
             let kind = openingKind(opening)
             let material = openingMaterial(opening, exterior: false)
-            segments.append(RFWallSegment(id: opening.id, name: nextName(kind), p1: opening.p1, p2: opening.p2, material: material, thickness: material.defaultThickness, height: opening.height, kind: kind, floor: floorOf(opening.story)))
+            segments.append(RFWallSegment(id: nextUniqueID(opening.id, in: &usedSegmentIDs), name: nextName(kind), p1: opening.p1, p2: opening.p2, material: material, thickness: material.defaultThickness, height: opening.height, kind: kind, floor: floorOf(opening.story)))
         }
 
         // 6. Objects: furniture for display, RF-relevant ones become obstacle boxes.
         var furniture: [FurnitureItem] = []
+        var usedFurnitureIDs = Set<String>()
         var group: Int32 = 1000
         for object in capture.objects {
             guard !Task.isCancelled else { return cancelledPlan }
+            let objectID = nextUniqueID(object.id, in: &usedFurnitureIDs)
             let center = rotated(object.position) + offset
             let yaw = object.yaw + rotation
             let floor = floorOf(object.story)
-            furniture.append(FurnitureItem(id: object.id, category: object.category, position: center, size: object.dimensions, yaw: yaw, floor: floor))
+            furniture.append(FurnitureItem(id: objectID, category: object.category, position: center, size: object.dimensions, yaw: yaw, floor: floor))
             guard let material = obstacleMaterial(forCategory: object.category) else { continue }
             group += 1
             let corners = boxCorners(center: center, size: object.dimensions, yaw: yaw)
             let name = objectName(forCategory: object.category)
             for i in 0..<4 {
                 segments.append(RFWallSegment(
-                    id: "\(object.id)#\(i)",
+                    id: nextUniqueID("\(objectID)#\(i)", in: &usedSegmentIDs),
                     name: name,
                     p1: corners[i],
                     p2: corners[(i + 1) % 4],

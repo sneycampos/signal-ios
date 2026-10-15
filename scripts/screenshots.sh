@@ -32,19 +32,27 @@ while [[ $# -gt 0 ]]; do
 done
 "$ROOT/scripts/build.sh"
 APP="$DERIVED/Build/Products/Debug-iphonesimulator/$APP_NAME.app"
+TMP_DIR=$(mktemp -d)
+CURRENT_UDID=""
+trap 'rm -rf "${TMP_DIR:-}"; [[ -n "${CURRENT_UDID:-}" ]] && xcrun simctl status_bar "$CURRENT_UDID" clear 2>/dev/null || true' EXIT
 
-# Take screenshots until two consecutive frames match (UI settled), max ~30 s.
+# Take screenshots until consecutive frames match (UI settled), max ~30 s.
 wait_stable() {
-  local udid="$1" out="$2" prev="" cur i tmp
-  tmp=$(mktemp -d)
+  local udid="$1" out="$2" need="${3:-1}" prev="" cur matches=0 i
+  rm -f "$TMP_DIR/f.png"
   sleep 2
   for i in $(seq 1 15); do
-    xcrun simctl io "$udid" screenshot "$tmp/f.png" >/dev/null 2>&1 || { sleep 2; continue; }
-    cur=$(shasum "$tmp/f.png" | awk '{print $1}')
-    if [[ -n "$prev" && "$cur" == "$prev" ]]; then break; fi
+    xcrun simctl io "$udid" screenshot "$TMP_DIR/f.png" >/dev/null 2>&1 || { sleep 2; continue; }
+    cur=$(shasum "$TMP_DIR/f.png" | awk '{print $1}')
+    if [[ -n "$prev" && "$cur" == "$prev" ]]; then
+      matches=$((matches + 1))
+      if (( matches >= need )); then break; fi
+    else
+      matches=0
+    fi
     prev="$cur"; sleep 2
   done
-  mv "$tmp/f.png" "$out"; rmdir "$tmp"
+  mv "$TMP_DIR/f.png" "$out"
 }
 
 shoot() {
@@ -54,15 +62,20 @@ shoot() {
   xcrun simctl boot "$udid" 2>/dev/null || true
   xcrun simctl bootstatus "$udid" -b >/dev/null
   xcrun simctl ui "$udid" appearance dark
+  CURRENT_UDID="$udid"
   xcrun simctl status_bar "$udid" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
   xcrun simctl install "$udid" "$APP"
   for s in map perspective inspector optimizer equipment; do
-    local extra=(); [[ $s != map ]] && extra=(-openSheet "$s")
+    local extra=() need=1
+    [[ $s != map ]] && extra=(-openSheet "$s")
+    [[ $s == optimizer ]] && need=2
     xcrun simctl launch --terminate-running-process "$udid" "$BUNDLE_ID" \
       -AppleLanguages "(en)" -AppleLocale en_US -openDemo ${extra[@]+"${extra[@]}"} >/dev/null
-    wait_stable "$udid" "$dir/$s.png"
+    wait_stable "$udid" "$dir/$s.png" "$need"
     info "$name: $s"
   done
+  xcrun simctl status_bar "$udid" clear 2>/dev/null || true
+  CURRENT_UDID=""
 }
 shoot "${IPHONE_SIM:-iPhone 17 Pro Max}" "$OUT/raw/iphone"
 shoot "${IPAD_SIM:-iPad Pro 13-inch (M5)}" "$OUT/raw/ipad"

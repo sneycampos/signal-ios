@@ -45,7 +45,7 @@ struct ProjectsHomeView: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("openDemo")
 
-                Text("Everything is calculated on this iPhone. Plans are stored in the Mesh Planner folder in the Files app.")
+                Text("Everything is calculated on this device. Plans are stored in the Mesh Planner folder in the Files app.")
                     .font(.footnote)
                     .foregroundStyle(.white.opacity(0.45))
                     .frame(maxWidth: .infinity)
@@ -79,7 +79,7 @@ struct ProjectsHomeView: View {
                 pendingDeletion = nil
             }
         } message: {
-            Text("The project and its backups will be removed from this iPhone.")
+            Text("The project and its backups will be removed from this device.")
         }
     }
 

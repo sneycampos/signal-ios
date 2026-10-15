@@ -121,43 +121,27 @@ struct FloorplanCanvas: View {
         var id: String { coverage.id }
     }
 
-    /// Largest rooms first; a label that would collide with another label, a node or the probe shows only its percentage.
+    /// Room labels depend only on room geometry and the map transform, never on the probe or the
+    /// routers, so dragging them cannot reshuffle the labels (they draw above the labels instead).
     private func layoutLabels(_ transform: PlanTransform) -> [LabelLayout] {
         let rooms = project.rooms(onFloor: model.floor)
         let areas = Dictionary(rooms.map { ($0.id, $0.area) }, uniquingKeysWith: { first, _ in first })
-        let labels = model.roomCoverage
-            .filter { areas[$0.id] != nil && $0.summary.cellCount > 0 }
-            .sorted { (areas[$0.id] ?? 0) > (areas[$1.id] ?? 0) }
-        var occupied: [CGRect] = project.accessPoints.filter { $0.floor == model.floor }.map {
-            let c = transform.point($0.position)
-            return CGRect(x: c.x - 26, y: c.y - 26, width: 52, height: 52)
-        }
-        if let probe = model.probe, probe.floor == model.floor {
-            let c = transform.point(probe.point)
-            occupied.append(CGRect(x: c.x - 60, y: c.y - 58, width: 120, height: 66))
-        }
-        return labels.compactMap { label in
-            let anchor = transform.point(label.labelPoint)
+        let labels = model.roomCoverage.filter { areas[$0.id] != nil && $0.summary.cellCount > 0 }
+        let byId = Dictionary(labels.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        // Sized for the widest percentage so a changing value never changes the layout.
+        let percentSize = ("100%" as NSString).size(withAttributes: [.font: UIFont.preferredFont(forTextStyle: .caption2)])
+        let inputs = labels.map { label in
             let nameSize = (label.name as NSString).size(withAttributes: [.font: UIFont.preferredFont(forTextStyle: .caption1)])
-            let percentSize = (Format.percent(label.summary.coveredPercent) as NSString).size(withAttributes: [.font: UIFont.preferredFont(forTextStyle: .caption2)])
-            let width = max(nameSize.width, percentSize.width) + 12
-            let height = nameSize.height + percentSize.height + 8
-            let candidates = [anchor, CGPoint(x: anchor.x, y: anchor.y + 36), CGPoint(x: anchor.x, y: anchor.y - 36)]
-            for center in candidates {
-                let full = CGRect(x: center.x - width / 2, y: center.y - height / 2, width: width, height: height)
-                if !occupied.contains(where: { $0.intersects(full) }) {
-                    occupied.append(full)
-                    return LabelLayout(coverage: label, center: center, compact: false)
-                }
-            }
-            for center in candidates {
-                let small = CGRect(x: center.x - (percentSize.width + 8) / 2, y: center.y - (percentSize.height + 4) / 2, width: percentSize.width + 8, height: percentSize.height + 4)
-                if !occupied.contains(where: { $0.intersects(small) }) {
-                    occupied.append(small)
-                    return LabelLayout(coverage: label, center: center, compact: true)
-                }
-            }
-            return nil
+            return RoomLabelInput(
+                id: label.id,
+                anchor: transform.point(label.labelPoint),
+                area: areas[label.id] ?? 0,
+                fullSize: CGSize(width: max(nameSize.width, percentSize.width) + 12, height: nameSize.height + percentSize.height + 8),
+                compactSize: CGSize(width: percentSize.width + 8, height: percentSize.height + 4)
+            )
+        }
+        return RoomLabelLayout.layout(inputs).compactMap { placed in
+            byId[placed.id].map { LabelLayout(coverage: $0, center: placed.center, compact: placed.compact) }
         }
     }
 }

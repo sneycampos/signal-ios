@@ -51,6 +51,8 @@ final class ScanController {
     private(set) var counts = Counts()
     private(set) var routerMarked = false
     private(set) var roomsCaptured = 0
+    var roomWarning: String?
+    private(set) var canCompleteFromWarning = false
 
     @ObservationIgnored let arSession = ARSession()
     @ObservationIgnored private(set) var captureView: RoomCaptureView!
@@ -59,6 +61,7 @@ final class ScanController {
     @ObservationIgnored private var routerMarker: simd_float3?
     @ObservationIgnored private var routerStory = 0
     @ObservationIgnored private var finishing = false
+    @ObservationIgnored private var hadWallsInCurrentRoom = false
     @ObservationIgnored private var cancelled = false
     @ObservationIgnored private var worldMap: Data?
     @ObservationIgnored private var processingTask: Task<Void, Never>?
@@ -87,6 +90,7 @@ final class ScanController {
     func nextRoom() {
         guard phase == .scanning else { return }
         finishing = false
+        hadWallsInCurrentRoom = counts.walls > 0
         phase = .processingRoom
         captureView.captureSession.stop(pauseARSession: false)
     }
@@ -94,6 +98,7 @@ final class ScanController {
     func finish() {
         guard phase == .scanning else { return }
         finishing = true
+        hadWallsInCurrentRoom = counts.walls > 0
         phase = .finishing
         arSession.getCurrentWorldMap { [weak self] map, _ in
             let data = map.flatMap { try? NSKeyedArchiver.archivedData(withRootObject: $0, requiringSecureCoding: true) }
@@ -102,6 +107,26 @@ final class ScanController {
                 self.worldMap = data
                 self.captureView.captureSession.stop(pauseARSession: false)
             }
+        }
+    }
+
+    func dismissWarning() {
+        roomWarning = nil
+        canCompleteFromWarning = false
+    }
+
+    func completeWithCapturedRooms() {
+        guard !cancelled, !rooms.isEmpty else { return }
+        roomWarning = nil
+        canCompleteFromWarning = false
+        finishing = true
+        phase = .finishing
+        captureView.captureSession.delegate = nil
+        captureView.delegate = nil
+        captureView.captureSession.stop(pauseARSession: true)
+        processingTask?.cancel()
+        processingTask = Task {
+            await complete()
         }
     }
 
@@ -125,7 +150,13 @@ final class ScanController {
         guard !cancelled else { return }
         processingTask?.cancel()
         processingTask = nil
-        phase = .failed("Scanning was interrupted. Close this scan and try again.")
+        roomWarning = nil
+        canCompleteFromWarning = false
+        phase = .failed(roomsCaptured > 0
+            ? "Scanning was interrupted. You can save the rooms already captured or close and try again."
+            : "Scanning was interrupted. Close this scan and try again.")
+        captureView.captureSession.delegate = nil
+        captureView.delegate = nil
         captureView.captureSession.stop(pauseARSession: true)
         arSession.pause()
     }
@@ -133,24 +164,34 @@ final class ScanController {
     // MARK: Delegate events
 
     fileprivate func didUpdate(_ room: CapturedRoom) {
-        guard !cancelled, phase == .scanning else { return }
+        guard !cancelled, captureView.captureSession.delegate != nil, phase == .scanning else { return }
         currentStory = room.story
         counts = Counts(walls: room.walls.count, doors: room.doors.count + room.openings.count, windows: room.windows.count, objects: room.objects.count)
     }
 
     fileprivate func didEnd(with data: CapturedRoomData, error: String?) {
-        guard !cancelled else { return }
+        guard !cancelled, captureView.captureSession.delegate != nil else { return }
+        if case .failed = phase { return }
         if let error {
-            phase = .failed("Scanning stopped: \(error). Close this scan and try again.")
+            roomWarning = nil
+            canCompleteFromWarning = false
+            phase = .failed(roomsCaptured > 0
+                ? "Scanning stopped: \(error). You can save the rooms already captured or close and try again."
+                : "Scanning stopped: \(error). Close this scan and try again.")
             arSession.pause()
             return
         }
         guard phase == .processingRoom || phase == .finishing else {
-            phase = .failed("Scanning was interrupted. Close this scan and try again.")
+            roomWarning = nil
+            canCompleteFromWarning = false
+            phase = .failed(roomsCaptured > 0
+                ? "Scanning was interrupted. You can save the rooms already captured or close and try again."
+                : "Scanning was interrupted. Close this scan and try again.")
             arSession.pause()
             return
         }
         processingTask = Task {
+            var roomBuildFailed = false
             do {
                 let room = try await RoomBuilder(options: [.beautifyObjects]).capturedRoom(from: data)
                 guard !Task.isCancelled, !cancelled else { return }
@@ -158,19 +199,29 @@ final class ScanController {
                 roomsCaptured = rooms.count
             } catch {
                 guard !Task.isCancelled, !cancelled else { return }
+                SignalDebugLogger.shared.log("Discarded room: \(error.localizedDescription)", category: "Scan")
                 if rooms.isEmpty && finishing {
-                    phase = .failed("Couldn't build the plan. Try again with more light, moving the iPhone slowly.")
+                    phase = .failed("Couldn't build the plan. Try again with more light, moving the device slowly.")
+                    arSession.pause()
                     return
                 }
-                SignalDebugLogger.shared.log("Discarded room: \(error.localizedDescription)", category: "Scan")
+                roomBuildFailed = true
             }
             guard !Task.isCancelled, !cancelled else { return }
-            if finishing {
+            if finishing && (!roomBuildFailed || !hadWallsInCurrentRoom) {
                 await complete()
             } else {
+                let wasFinishing = finishing
+                finishing = false
                 roomNumber = rooms.count + 1
                 counts = Counts()
                 phase = .scanning
+                if roomBuildFailed {
+                    canCompleteFromWarning = wasFinishing && !rooms.isEmpty
+                    roomWarning = canCompleteFromWarning
+                        ? "Couldn't process Room \(roomNumber). You can scan this room again or save the rooms already captured."
+                        : "Couldn't process Room \(roomNumber). Scan this room again with good light, moving the device slowly."
+                }
                 captureView.captureSession.run(configuration: RoomCaptureSession.Configuration())
             }
         }
@@ -204,13 +255,35 @@ final class ScanController {
     /// Fallback when StructureBuilder fails: rooms already share world coordinates.
     private func merged(_ rooms: [CapturedRoom]) -> RoomPlanCapture {
         var result = RoomPlanCapture(surfaces: [])
-        for room in rooms {
+        for (roomIndex, room) in rooms.enumerated() {
             let part = RoomPlanExtraction.capture(from: room, routerMarker: nil)
-            result.surfaces += part.surfaces
-            result.objects += part.objects
+            let prefix = "r\(roomIndex)_"
+            result.surfaces += part.surfaces.map { s in
+                RoomPlanRawSurface(
+                    id: prefix + s.id,
+                    p1: s.p1,
+                    p2: s.p2,
+                    height: s.height,
+                    thickness: s.thickness,
+                    category: s.category,
+                    parentId: s.parentId.map { prefix + $0 },
+                    isOpen: s.isOpen,
+                    story: s.story
+                )
+            }
+            result.objects += part.objects.map { o in
+                RoomPlanRawObject(
+                    id: prefix + o.id,
+                    position: o.position,
+                    dimensions: o.dimensions,
+                    category: o.category,
+                    yaw: o.yaw,
+                    story: o.story
+                )
+            }
             result.floors += part.floors
             result.sections += part.sections
-            result.floorY = min(result.floorY ?? .greatestFiniteMagnitude, part.floorY ?? .greatestFiniteMagnitude)
+            result.floorY = [result.floorY, part.floorY].compactMap { $0 }.min()
         }
         result.routerMarker = routerMarker.map { SIMD2($0.x, $0.z) }
         result.routerMarkerStory = routerStory

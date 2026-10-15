@@ -8,6 +8,7 @@ import SignalCore
 struct ARWalkthroughView: View {
     @Environment(FloorplanViewModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @State private var session = ARWalkSession()
 
     var body: some View {
@@ -30,6 +31,12 @@ struct ARWalkthroughView: View {
                     Spacer()
                     statusPill
                 }
+                if session.cameraDenied {
+                    Button("Open Settings") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
                 Spacer()
                 if let reading = session.reading {
                     LiveReadingCard(reading: reading, scale: model.scale)
@@ -43,7 +50,10 @@ struct ARWalkthroughView: View {
                 return
             }
             let map = await model.worldMapData()
-            await session.start(project: project, alignment: alignment, floor: model.floor, heatmap: model.heatmapImage, worldMap: map)
+            await session.start(project: project, alignment: alignment, floor: model.floor, heatmap: model.heatmapImage, backhaul: model.backhaul, worldMap: map)
+        }
+        .onChange(of: model.heatmapImage.map(ObjectIdentifier.init)) {
+            session.updateHeatmap(model.heatmapImage)
         }
         .onDisappear { session.stop() }
     }
@@ -116,6 +126,7 @@ final class ARWalkSession {
 
     var status: Status = .loading
     private(set) var reading: ProbeReading?
+    private(set) var cameraDenied = false
 
     @ObservationIgnored let arView = ARView(frame: .zero, cameraMode: .ar, automaticallyConfigureSession: false)
     @ObservationIgnored private var delegate: ARWalkDelegate?
@@ -126,21 +137,35 @@ final class ARWalkSession {
     @ObservationIgnored private var propagation: PropagationModel?
     @ObservationIgnored private var backhaul: [String: BackhaulLink] = [:]
     @ObservationIgnored private var placed = false
+    @ObservationIgnored private var trackingNormal = false
     @ObservationIgnored private var lastUpdate: TimeInterval = 0
     @ObservationIgnored private var stopped = false
 
-    func start(project: FloorplanProject, alignment: WorldAlignment, floor: Int, heatmap: CGImage?, worldMap: Data?) async {
+    func start(project: FloorplanProject, alignment: WorldAlignment, floor: Int, heatmap: CGImage?, backhaul: [String: BackhaulLink] = [:], worldMap: Data?) async {
         guard !Task.isCancelled, !stopped else { return }
         guard ARWorldTrackingConfiguration.isSupported else {
             status = .failed("This device does not support augmented reality.")
+            return
+        }
+        if ScanAvailability.current == .cameraDenied {
+            cameraDenied = true
+            status = .failed("Camera access is turned off. Allow camera access in Settings to use augmented reality.")
+            return
+        }
+        guard let worldMap, let map = try? NSKeyedUnarchiver.unarchivedObject(ofClass: ARWorldMap.self, from: worldMap) else {
+            status = .failed("No environment map for this project. Scan again to use AR.")
             return
         }
         self.project = project
         self.alignment = alignment
         self.floor = floor
         self.heatmap = heatmap
-        propagation = PropagationModel(walls: project.walls, band: project.selectedBand, calibration: project.calibration, floorHeight: project.profile.floorHeight)
-        backhaul = BackhaulPlanner.plan(accessPoints: project.accessPoints, walls: project.walls, profile: project.profile, calibration: project.calibration)
+        self.backhaul = backhaul
+        let prop = await Task.detached(priority: .userInitiated) {
+            PropagationModel(walls: project.walls, band: project.selectedBand, calibration: project.calibration, floorHeight: project.profile.floorHeight)
+        }.value
+        guard !Task.isCancelled, !stopped else { return }
+        propagation = prop
 
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = [.horizontal]
@@ -148,17 +173,21 @@ final class ARWalkSession {
             configuration.sceneReconstruction = .mesh
             arView.environment.sceneUnderstanding.options.insert(.occlusion)
         }
-        if let worldMap, let map = try? NSKeyedUnarchiver.unarchivedObject(ofClass: ARWorldMap.self, from: worldMap) {
-            configuration.initialWorldMap = map
-            status = .relocalizing
-        } else {
-            status = .failed("No environment map for this project. Scan again to use AR.")
-            return
-        }
+        configuration.initialWorldMap = map
+        status = .relocalizing
         let delegate = ARWalkDelegate(session: self)
         self.delegate = delegate
         arView.session.delegate = delegate
         arView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+    }
+
+    func updateHeatmap(_ newHeatmap: CGImage?) {
+        guard !stopped else { return }
+        heatmap = newHeatmap
+        if trackingNormal, !placed, heatmap != nil {
+            placeHeatmap()
+            if placed { status = .ready }
+        }
     }
 
     func stop() {
@@ -172,11 +201,10 @@ final class ARWalkSession {
     fileprivate func trackingChanged(isNormal: Bool) {
         guard !stopped else { return }
         if case .failed = status { return }
+        trackingNormal = isNormal
         if isNormal {
             placeHeatmap()
-            status = .ready
-        } else if case .failed = status {
-            return
+            if placed { status = .ready }
         } else {
             reading = nil
             status = .relocalizing

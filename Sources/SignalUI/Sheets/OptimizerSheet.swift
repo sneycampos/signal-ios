@@ -63,7 +63,7 @@ struct OptimizerSheet: View {
             }
             .onAppear {
                 lockRouter = model.project?.router?.isLocked ?? false
-                let current = model.project?.satellites.count ?? 0
+                let current = min(6, model.project?.satellites.filter { $0.floor == model.floor }.count ?? 0)
                 choice = current > 0 ? .count(current) : .automatic
             }
         }
@@ -72,16 +72,19 @@ struct OptimizerSheet: View {
     private var options: some View {
         Group {
             Section {
-                Toggle(isOn: $lockRouter) {
-                    VStack(alignment: .leading) {
-                        Text("Keep the router where it is")
-                        Text("Turn on if it depends on the fiber outlet or cable").font(.caption).foregroundStyle(.secondary)
+                if model.project?.router?.floor == model.floor {
+                    Toggle(isOn: $lockRouter) {
+                        VStack(alignment: .leading) {
+                            Text("Keep the router where it is")
+                            Text("Turn on if it depends on the fiber outlet or cable").font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
+                let maxSatellites = max(3, min(6, model.project?.satellites.filter { $0.floor == model.floor }.count ?? 0))
                 Picker("Mesh satellites", selection: $choice) {
                     Text("Recommend how many").tag(SatelliteChoice.automatic)
                     Text("None").tag(SatelliteChoice.count(0))
-                    ForEach(1...3, id: \.self) { n in
+                    ForEach(1...maxSatellites, id: \.self) { n in
                         Text("\(n)").tag(SatelliteChoice.count(n))
                     }
                 }

@@ -127,7 +127,7 @@ public final class FloorplanViewModel {
     public private(set) var roomCoverage: [RoomCoverage] = []
     public private(set) var backhaul: [String: BackhaulLink] = [:]
     public private(set) var probe: ProbeReading?
-    public private(set) var isComputing = false
+    public var isComputing: Bool { isComputingField || isComputingBackhaul }
     public var optimizer: OptimizerState = .idle
     public private(set) var canUndo = false
     public var toast: ToastMessage?
@@ -137,8 +137,11 @@ public final class FloorplanViewModel {
 
     // MARK: Private
 
+    private var isComputingField = false
+    private var isComputingBackhaul = false
     @ObservationIgnored private var computeTask: Task<Void, Never>?
     @ObservationIgnored private var computeGeneration = 0
+    @ObservationIgnored private var backhaulGeneration = 0
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var optimizerTask: Task<Void, Never>?
     @ObservationIgnored private var optimizerToken: CancellationToken?
@@ -182,6 +185,7 @@ public final class FloorplanViewModel {
     }
 
     public var isProjectOpen: Bool { project != nil }
+    public var hasUnsavedChanges: Bool { dirty }
     public var scale: SignalScale { SignalScale(profile: project?.profile ?? NetworkProfile()) }
     public var band: RFBand { project?.selectedBand ?? .five }
 
@@ -235,7 +239,9 @@ public final class FloorplanViewModel {
         computeTask?.cancel()
         backhaulTask?.cancel()
         computeGeneration += 1
-        isComputing = false
+        backhaulGeneration += 1
+        isComputingField = false
+        isComputingBackhaul = false
         project = nil
         hasWorldMap = false
         draggingAccessPointId = nil
@@ -267,6 +273,7 @@ public final class FloorplanViewModel {
             computeTask?.cancel()
             backhaulTask?.cancel()
             computeGeneration += 1
+            backhaulGeneration += 1
             cancelOptimizer()
             dirty = false
             project = nil
@@ -279,7 +286,8 @@ public final class FloorplanViewModel {
             roomCoverage = []
             coverageContours = []
             weakContours = []
-            isComputing = false
+            isComputingField = false
+            isComputingBackhaul = false
         }
         await refreshProjects()
     }
@@ -354,10 +362,15 @@ public final class FloorplanViewModel {
     // MARK: - Import / export
 
     public func importProject(from url: URL) async {
+        if let existingID = await store.isExistingProjectFile(url) {
+            await open(id: existingID)
+            return
+        }
         do {
             let imported = try await store.importProject(from: url)
             await refreshProjects()
-            guard await present(imported) else { return }
+            let hasMap = await store.worldMap(for: imported.id) != nil
+            guard await present(imported, hasWorldMap: hasMap) else { return }
             toast = ToastMessage(text: "Project imported.", offersUndo: false)
         } catch {
             errorMessage = error.localizedDescription
@@ -383,14 +396,31 @@ public final class FloorplanViewModel {
 
     public func setBand(_ band: RFBand) {
         guard project?.selectedBand != band else { return }
+        field = nil
+        heatmapImage = nil
+        coverage = .empty
+        roomCoverage = []
+        coverageContours = []
+        weakContours = []
         mutate(undoable: false, recompute: .full) { $0.selectedBand = band }
     }
 
     public func setFloor(_ newFloor: Int) {
         guard let project, newFloor >= 0, newFloor < project.floorCount, newFloor != floor else { return }
         floor = newFloor
+        let rooms = project.rooms(onFloor: newFloor)
+        if !rooms.isEmpty, !rooms.contains(where: { $0.contains(project.probe) }) {
+            self.project?.probe = rooms[0].labelPoint
+        }
+        self.project?.probeFloor = newFloor
         invalidateOptimizer()
         selection = nil
+        field = nil
+        heatmapImage = nil
+        coverage = .empty
+        roomCoverage = []
+        coverageContours = []
+        weakContours = []
         refreshInstant()
         recompute(quality: .full)
     }
@@ -455,17 +485,39 @@ public final class FloorplanViewModel {
 
     public func updateAccessPoint(id: String, _ change: (inout RFAccessPoint) -> Void) {
         guard let project, let index = project.accessPoints.firstIndex(where: { $0.id == id }) else { return }
-        var ap = project.accessPoints[index]
+        let previous = project.accessPoints[index]
+        var ap = previous
         change(&ap)
-        guard ap != project.accessPoints[index] else { return }
-        mutate(recompute: .full) { $0.accessPoints[index] = ap }
+        let trimmed = ap.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        ap.name = trimmed.isEmpty ? previous.name : trimmed
+        if ap.floor != previous.floor {
+            ap.floor = max(0, min(project.floorCount - 1, ap.floor))
+            ap.position = validPosition(ap.position, floor: ap.floor, previous: nil) ?? ap.position
+        }
+        guard ap != previous else { return }
+        let rfChanged = ap.position != previous.position
+            || ap.txPower != previous.txPower
+            || ap.isSatellite != previous.isSatellite
+            || ap.isActive != previous.isActive
+            || ap.floor != previous.floor
+            || ap.backhaul != previous.backhaul
+        mutate(recompute: rfChanged ? .full : .none) { $0.accessPoints[index] = ap }
     }
 
     public func updateRoom(id: String, name: String? = nil, kind: RoomKind? = nil) {
-        guard let index = project?.rooms.firstIndex(where: { $0.id == id }) else { return }
-        mutate(recompute: .full) { p in
-            if let name, !name.trimmingCharacters(in: .whitespaces).isEmpty { p.rooms[index].name = name }
-            if let kind { p.rooms[index].kind = kind }
+        guard let project, let index = project.rooms.firstIndex(where: { $0.id == id }) else { return }
+        let previous = project.rooms[index]
+        var room = previous
+        if let name {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { room.name = trimmed }
+        }
+        if let kind { room.kind = kind }
+        guard room != previous else { return }
+        mutate(recompute: .none) { $0.rooms[index] = room }
+        if let covIndex = roomCoverage.firstIndex(where: { $0.id == id }) {
+            let old = roomCoverage[covIndex]
+            roomCoverage[covIndex] = RoomCoverage(id: old.id, name: room.name, kind: room.kind, labelPoint: old.labelPoint, summary: old.summary, grade: old.grade, servingAccessPointId: old.servingAccessPointId)
         }
     }
 
@@ -501,8 +553,13 @@ public final class FloorplanViewModel {
         change(&profile)
         profile.normalizeChannelWidths()
         guard profile != project.profile else { return }
+        var a = profile
+        var b = project.profile
+        a.internetPlanMbps = 0
+        b.internetPlanMbps = 0
+        let rfChanged = a != b
         let constructionChanged = profile.construction != project.profile.construction
-        mutate(recompute: .full, invalidatesModel: true) { p in
+        mutate(undoable: rfChanged, recompute: rfChanged ? .full : .none, invalidatesModel: rfChanged) { p in
             p.profile = profile
             if !profile.supportedBands.contains(p.selectedBand) { p.selectedBand = profile.planningBand }
             if constructionChanged {
@@ -642,9 +699,15 @@ public final class FloorplanViewModel {
         let currentFloor = floor
         mutate(recompute: .full) { p in
             if let routerIndex = p.accessPoints.firstIndex(where: { !$0.isSatellite }) {
+                if p.accessPoints[routerIndex].position != proposal.routerPosition {
+                    p.accessPoints[routerIndex].isLocked = false
+                }
                 p.accessPoints[routerIndex].position = proposal.routerPosition
             }
-            let satelliteIds = p.accessPoints.filter { $0.isSatellite && $0.floor == currentFloor }.map(\.id)
+            let satelliteIds = p.accessPoints
+                .filter { $0.isSatellite && $0.floor == currentFloor }
+                .sorted { ($0.backhaul == .wired ? 0 : 1) < ($1.backhaul == .wired ? 0 : 1) }
+                .map(\.id)
             for (i, position) in proposal.satellitePositions.enumerated() {
                 if i < satelliteIds.count, let index = p.accessPoints.firstIndex(where: { $0.id == satelliteIds[i] }) {
                     p.accessPoints[index].position = position
@@ -671,7 +734,9 @@ public final class FloorplanViewModel {
         let beforeAPs = project.accessPoints
         var afterAPs = project.accessPoints.filter { !($0.isSatellite && $0.floor == floor) }
         if let r = afterAPs.firstIndex(where: { !$0.isSatellite }) { afterAPs[r].position = proposal.routerPosition }
-        let existing = project.accessPoints.filter { $0.isSatellite && $0.floor == floor }
+        let existing = project.accessPoints
+            .filter { $0.isSatellite && $0.floor == floor }
+            .sorted { ($0.backhaul == .wired ? 0 : 1) < ($1.backhaul == .wired ? 0 : 1) }
         for (i, position) in proposal.satellitePositions.enumerated() {
             var sat = i < existing.count ? existing[i] : RFAccessPoint(name: "", position: position, isSatellite: true, floor: floor)
             sat.position = position
@@ -782,14 +847,38 @@ public final class FloorplanViewModel {
         return model
     }
 
+    private static func needsBackhaulRefresh(from old: FloorplanProject?, to new: FloorplanProject) -> Bool {
+        guard let old else { return true }
+        guard old.walls == new.walls, old.calibration == new.calibration,
+              old.profile.standard == new.profile.standard,
+              old.profile.channelWidth24 == new.profile.channelWidth24,
+              old.profile.channelWidth5 == new.profile.channelWidth5,
+              old.profile.channelWidth6 == new.profile.channelWidth6,
+              old.profile.dedicatedBackhaulRadio == new.profile.dedicatedBackhaulRadio,
+              old.profile.backhaulBand == new.profile.backhaulBand,
+              old.profile.floorHeight == new.profile.floorHeight,
+              old.accessPoints.count == new.accessPoints.count else { return true }
+        for (a, b) in zip(old.accessPoints, new.accessPoints) {
+            if a.id != b.id || a.position != b.position || a.txPower != b.txPower
+                || a.isSatellite != b.isSatellite || a.isActive != b.isActive
+                || a.floor != b.floor || a.backhaul != b.backhaul {
+                return true
+            }
+        }
+        return false
+    }
+
     /// Probe feedback is immediate; backhaul is refreshed only when network inputs change.
     private func refreshInstant() {
         guard let project else { return }
         let model = model(for: project, band: project.selectedBand)
-        if backhaulKey?.accessPoints != project.accessPoints || backhaulKey?.walls != project.walls || backhaulKey?.profile != project.profile || backhaulKey?.calibration != project.calibration {
+        if Self.needsBackhaulRefresh(from: backhaulKey, to: project) {
             backhaulKey = project
             backhaulTask?.cancel()
+            backhaulGeneration += 1
+            let generation = backhaulGeneration
             backhaul = [:]
+            isComputingBackhaul = true
             let token = CancellationToken()
             backhaulTask = Task { [weak self] in
                 let links = await withTaskCancellationHandler {
@@ -797,8 +886,9 @@ public final class FloorplanViewModel {
                         BackhaulPlanner.plan(accessPoints: project.accessPoints, walls: project.walls, profile: project.profile, calibration: project.calibration, token: token)
                     }.value
                 } onCancel: { token.cancel() }
-                guard let self, !Task.isCancelled, self.project?.id == project.id else { return }
+                guard let self, generation == self.backhaulGeneration, !Task.isCancelled, self.project?.id == project.id else { return }
                 self.backhaul = links
+                self.isComputingBackhaul = false
                 if let current = self.project {
                     self.probe = Self.reading(project: current, model: self.model(for: current, band: current.selectedBand), backhaul: links, point: current.probe, floor: current.probeFloor)
                 }
@@ -855,7 +945,7 @@ public final class FloorplanViewModel {
         let depth = project.depth
         let isLive = quality == .live
         if !isLive { computeTask?.cancel() }
-        isComputing = true
+        isComputingField = true
 
         let token = CancellationToken()
         let task = Task { [weak self] in
@@ -885,8 +975,12 @@ public final class FloorplanViewModel {
                 self.coverageContours = output.coverageContours
                 self.weakContours = output.weakContours
                 self.coverage = output.field.coverage
-                self.roomCoverage = output.rooms
-                self.isComputing = false
+                let latestRooms = self.project?.rooms ?? []
+                self.roomCoverage = output.rooms.map { cov in
+                    guard let room = latestRooms.first(where: { $0.id == cov.id }) else { return cov }
+                    return RoomCoverage(id: cov.id, name: room.name, kind: room.kind, labelPoint: cov.labelPoint, summary: cov.summary, grade: cov.grade, servingAccessPointId: cov.servingAccessPointId)
+                }
+                self.isComputingField = false
             }
         }
         computeTask = task
@@ -937,7 +1031,8 @@ public final class FloorplanViewModel {
         let floorWalls = project.walls.filter { $0.floor == floor }
         let obstacles = Geometry.obstacleFootprints(floorWalls, floor: floor)
         if obstacles.contains(where: { Geometry.contains($0, p) }) {
-            return previous
+            guard previous == nil, let fallbackRoom = rooms.first(where: { r in !obstacles.contains { Geometry.contains($0, r.labelPoint) } }) else { return previous }
+            p = fallbackRoom.labelPoint
         }
         return RoomPlanConverter.pushAwayFromWalls(p, walls: floorWalls)
     }

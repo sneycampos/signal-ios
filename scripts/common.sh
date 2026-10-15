@@ -38,9 +38,14 @@ generate() {
   (cd "$ROOT" && xcodegen generate --quiet)
 }
 
-# Available simulators whose iOS runtime meets the deployment target (17).
+# Available simulators in the newest iOS runtime that meets the deployment target (17).
 simulators() {
-  xcrun simctl list devices available | awk '/^-- iOS / { split($3, v, "."); ok = (v[1] + 0 >= 17); next } /^-- / { ok = 0; next } ok'
+  xcrun simctl list devices available | awk '
+    /^-- iOS / { split($3, v, "."); ok = (v[1] + 0 >= 17); if (ok) buf = ""; next }
+    /^-- / { ok = 0; next }
+    ok { buf = buf $0 "\n" }
+    END { printf "%s", buf }
+  '
 }
 
 # Pick an available iPhone simulator (override with SIMULATOR="iPhone 17 Pro").

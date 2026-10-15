@@ -17,9 +17,9 @@ struct InspectorSheet: View {
                         case .wall(let id):
                             if let wall = model.wall(id: id) { WallEditor(wall: wall) }
                         case .accessPoint(let id):
-                            if let ap = model.accessPoint(id: id) { AccessPointEditor(ap: ap) }
+                            if let ap = model.accessPoint(id: id) { AccessPointEditor(ap: ap).id(ap.id) }
                         case .room(let id):
-                            if let room = model.room(id: id) { RoomDetail(room: room) }
+                            if let room = model.room(id: id) { RoomDetail(room: room).id(room.id) }
                         case nil:
                             EmptyView()
                         }
@@ -272,17 +272,24 @@ private struct AccessPointEditor: View {
     @Environment(FloorplanViewModel.self) private var model
     let ap: RFAccessPoint
     @State private var name = ""
+    @FocusState private var nameFocused: Bool
     @State private var confirmRemoval = false
 
     var body: some View {
         Section {
-            TextField("Name", text: Binding(get: { ap.name }, set: { value in model.updateAccessPoint(id: ap.id) { $0.name = value } }))
+            TextField("Name", text: $name)
+                .focused($nameFocused)
+                .onSubmit { commitName(for: ap.id) }
             Stepper(value: Binding(get: { Int(ap.txPower) }, set: { value in model.updateAccessPoint(id: ap.id) { $0.txPower = Float(value) } }), in: 10...30) {
                 LabeledContent("Power", value: Format.dbm(ap.txPower))
             }
             if let project = model.project {
-                Picker("Floor", selection: Binding(get: { ap.floor }, set: { value in model.updateAccessPoint(id: ap.id) { $0.floor = value } })) {
-                    ForEach(0..<project.floorCount, id: \.self) { Text("Floor \($0)").tag($0) }
+                if project.floorCount > 1 {
+                    Picker("Floor", selection: Binding(get: { ap.floor }, set: { value in model.updateAccessPoint(id: ap.id) { $0.floor = value } })) {
+                        ForEach(0..<project.floorCount, id: \.self) { floor in
+                            Text(floor == 0 ? String(localized: "Ground floor") : String(localized: "Floor \(floor)")).tag(floor)
+                        }
+                    }
                 }
                 Stepper("Horizontal position: \(Format.meters(ap.position.x))", value: Binding(get: { Double(ap.position.x) }, set: { model.moveAccessPoint(id: ap.id, to: SIMD2(Float($0), ap.position.y)) }), in: 0...Double(project.width), step: 0.25)
                 Stepper("Vertical position: \(Format.meters(ap.position.y))", value: Binding(get: { Double(ap.position.y) }, set: { model.moveAccessPoint(id: ap.id, to: SIMD2(ap.position.x, Float($0))) }), in: 0...Double(project.depth), step: 0.25)
@@ -296,6 +303,14 @@ private struct AccessPointEditor: View {
                 }
             }
         }
+        .onAppear { name = ap.name }
+        .onChange(of: nameFocused) { _, focused in
+            if !focused { commitName(for: ap.id) }
+        }
+        .onChange(of: ap.name) { _, newValue in
+            name = newValue
+        }
+        .onDisappear { commitName(for: ap.id) }
 
         if ap.isSatellite {
             Section {
@@ -327,6 +342,15 @@ private struct AccessPointEditor: View {
             }
         }
     }
+
+    private func commitName(for id: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let current = model.accessPoint(id: id), current.name != trimmed else {
+            if id == ap.id, let current = model.accessPoint(id: id) { name = current.name }
+            return
+        }
+        model.updateAccessPoint(id: id) { $0.name = trimmed }
+    }
 }
 
 // MARK: - Room
@@ -335,11 +359,14 @@ private struct RoomDetail: View {
     @Environment(FloorplanViewModel.self) private var model
     let room: RoomInfo
     @State private var name = ""
+    @FocusState private var nameFocused: Bool
 
     var body: some View {
         let coverage = model.roomCoverage.first { $0.id == room.id }
         Section {
-            TextField("Name", text: Binding(get: { room.name }, set: { model.updateRoom(id: room.id, name: $0) }))
+            TextField("Name", text: $name)
+                .focused($nameFocused)
+                .onSubmit { commitName(for: room.id) }
             Picker("Type", selection: Binding(get: { room.kind }, set: { model.updateRoom(id: room.id, kind: $0) })) {
                 ForEach(RoomKind.allCases) { kind in
                     Text(kind.baseName).tag(kind)
@@ -349,6 +376,14 @@ private struct RoomDetail: View {
         } footer: {
             Text("The type sets how much this room matters when finding the best placement.")
         }
+        .onAppear { name = room.name }
+        .onChange(of: nameFocused) { _, focused in
+            if !focused { commitName(for: room.id) }
+        }
+        .onChange(of: room.name) { _, newValue in
+            name = newValue
+        }
+        .onDisappear { commitName(for: room.id) }
         if let coverage {
             Section("Coverage on \(model.band.displayName)") {
                 LabeledContent("Area with good signal", value: Format.percent(coverage.summary.coveredPercent))
@@ -363,6 +398,15 @@ private struct RoomDetail: View {
                 }
             }
         }
+    }
+
+    private func commitName(for id: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let current = model.room(id: id), current.name != trimmed else {
+            if id == room.id, let current = model.room(id: id) { name = current.name }
+            return
+        }
+        model.updateRoom(id: id, name: trimmed)
     }
 }
 

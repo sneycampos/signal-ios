@@ -272,7 +272,7 @@ struct PlanPainter {
         let targets = [proposal.routerPosition] + proposal.satellitePositions
         let current = project.accessPoints.filter { $0.floor == floor }
         let router = current.first { !$0.isSatellite }
-        let satellites = current.filter(\.isSatellite)
+        let satellites = current.filter(\.isSatellite).sorted { ($0.backhaul == .wired ? 0 : 1) < ($1.backhaul == .wired ? 0 : 1) }
         for (i, target) in targets.enumerated() {
             if i == 0 && router == nil { continue }
             let t = transform.point(target)
